@@ -283,10 +283,10 @@ def shoe_dimension_row(label):
     primary = label_primary(label) or str(label or "").strip()
     return {
         "shoe_code": code_from_label(primary, "shoe"),
-        "brand": "Unknown",
-        "model": primary or "Unknown",
+        "brand": None,
+        "model": primary or None,
         "nickname": None,
-        "category": "Daily Trainer",
+        "category": None,
         "is_active": 1,
     }
 
@@ -4381,7 +4381,10 @@ def weekly_review_panel(weekly, intelligence, history_rows, distribution_rows, k
 def shoe_display_name(row):
     if "shoe_display_name" in row.keys() and row["shoe_display_name"]:
         return str(row["shoe_display_name"])
-    parts = [row["brand"], row["model"], row["nickname"]]
+    brand = row["brand"]
+    if str(brand or "").strip().lower() == "unknown":
+        brand = None
+    parts = [brand, row["model"], row["nickname"]]
     return " ".join(str(part) for part in parts if part)
 
 
@@ -5103,9 +5106,7 @@ def metadata_page_panel(
     shoe_options = [
         {
             "code": row["shoe_code"],
-            "label": " ".join(
-                part for part in (row["brand"], row["model"], row["nickname"]) if part
-            ).strip() or row["shoe_code"],
+            "label": shoe_display_name(row) or row["shoe_code"],
             "extra": "active" if row["is_active"] else "retired",
         }
         for row in shoes

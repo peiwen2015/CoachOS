@@ -4134,6 +4134,177 @@ def activity_split_table(split_rows):
     """
 
 
+def activity_ai_handoff_text(activity, review, split_rows, weekly_review=None, monthly_overview=None, include_raw_data=False):
+    if not activity or not review:
+        return ""
+
+    activity_name = str(activity["activity_name"] or activity["activity_type"] or "活動")
+    workout_name = str(activity["workout_type_name_en"] or activity["activity_type"] or "活動")
+    start_time = format_short_datetime(activity["activity_start_time"])
+    distance_text = f"{format_number(activity['distance_km'], 2)} km"
+    load_text = format_number(activity["training_load"], 0) or "—"
+    pace_text = format_pace_seconds(activity["avg_pace_sec_per_km"]) or "—"
+    hr_text = "" if activity["avg_hr"] is None else str(int(round(activity["avg_hr"])))
+    shoe_text = str(activity["shoe_display_name"] or "未標註")
+    purpose_text = str(activity["primary_training_purpose_name_en"] or "未標註")
+
+    cause_lines = []
+    for card in review.get("cards", []):
+        cause_lines.append(f"- {card['title']}：{card['value']}；{card['note']}")
+
+    segment_lines = []
+    for row in activity_key_segments(split_rows):
+        segment_lines.append(
+            f"- {row['label']}（{row['section']}）：{row['metric']}；{row['note']}"
+        )
+
+    context_lines = []
+    if weekly_review:
+        context_lines.append(f"- 本週學習：{weekly_review['focus']}")
+    if monthly_overview:
+        context_lines.append(f"- 本月位置：{monthly_overview['verdict']}；{monthly_overview['verdict_reason']}")
+
+    prompt_lines = [
+        "請根據以下已治理的跑步資料，用繁體中文做進一步分析。",
+        "請先回答這堂課的整體判讀，再說明原因，最後給一個下一步提醒。",
+        "只能根據我提供的內容分析，不要自行發明額外訓練、健康或心理狀態。",
+        "",
+        "## Activity Facts",
+        f"- 活動：{activity_name}",
+        f"- 開始時間：{start_time}",
+        f"- 類型：{workout_name}",
+        f"- 距離：{distance_text}",
+        f"- 負荷：{load_text}",
+        f"- 平均配速：{pace_text}",
+        f"- 平均心率：{hr_text}",
+        f"- 鞋款：{shoe_text}",
+        f"- 主要目的：{purpose_text}",
+        "",
+        "## Coach Understanding",
+        f"- 問題：{review['learning_question']}",
+        f"- Learning：{review['learning']}",
+        f"- Focus：{review['focus']}",
+        f"- Why：{review['why']}",
+        f"- Next：{review['looking_forward']}",
+        "",
+        "## Reasoning",
+        *cause_lines,
+    ]
+
+    if segment_lines:
+        prompt_lines.extend([
+            "",
+            "## Attention Segments",
+            *segment_lines,
+        ])
+
+    if context_lines:
+        prompt_lines.extend([
+            "",
+            "## Context",
+            *context_lines,
+        ])
+
+    if include_raw_data and split_rows:
+        prompt_lines.extend([
+            "",
+            "## Evidence",
+            "### 完整每公里 split 原始資料",
+            "| KM | 距離 | 配速 | HR | 功率 | 步頻 |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ])
+        for row in split_rows:
+            prompt_lines.append(
+                "| {km} | {distance} | {pace} | {hr} | {power} | {cadence} |".format(
+                    km=row["split_index"],
+                    distance=format_number((row["split_distance_m"] or 0) / 1000, 2) or "—",
+                    pace=format_pace_seconds(row["elapsed_pace_sec_per_km"]) or "—",
+                    hr="" if row["avg_hr"] is None else int(round(row["avg_hr"])),
+                    power="" if row["avg_power_w"] is None else int(round(row["avg_power_w"])),
+                    cadence="" if row["avg_cadence_spm"] is None else format_number(row["avg_cadence_spm"], 1),
+                )
+            )
+
+    prompt_lines.extend([
+        "",
+        "## Instructions",
+        "- 先講這堂課真正留下來的是什麼。",
+        "- 再解釋為什麼平台會這樣判讀。",
+        "- 最後只留一個下一堂課提醒。",
+        "- 如果你從原始 split 看見平台尚未明說、但值得注意的節奏或身體訊號，可以補充提出。",
+        "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據 raw data 額外補充的觀察。",
+        "- 如果 raw data 與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
+    ])
+
+    return "\n".join(prompt_lines)
+
+
+def activity_ai_handoff_panel(activity, review, split_rows, weekly_review=None, monthly_overview=None):
+    handoff_text = activity_ai_handoff_text(
+        activity,
+        review,
+        split_rows,
+        weekly_review,
+        monthly_overview,
+        include_raw_data=False,
+    )
+    raw_handoff_text = activity_ai_handoff_text(
+        activity,
+        review,
+        split_rows,
+        weekly_review,
+        monthly_overview,
+        include_raw_data=True,
+    )
+    if not handoff_text or not raw_handoff_text:
+        return ""
+
+    escaped_text = html.escape(handoff_text)
+    escaped_raw_text = html.escape(raw_handoff_text)
+
+    return f"""
+      <section class="panel-section">
+        <h2>交給 AI 繼續分析</h2>
+        <div class="review-card ai-handoff-card">
+          <span>AI Share Handoff</span>
+          <strong>把這堂課的教練脈絡直接交給你習慣的 AI</strong>
+          <p>你可以先用精簡版交出教練脈絡；如果想讓 AI 有機會補充平台沒明說的觀察，再用含 raw data 的完整版。</p>
+          <div class="ai-handoff-block">
+            <div class="ai-handoff-block-head">
+              <div>
+                <strong>精簡版</strong>
+                <p class="note">先給教練判讀、形成原因、關鍵片段與上下文。</p>
+              </div>
+              <div class="ai-handoff-actions">
+                <button class="secondary-action" type="button" onclick="copyAiHandoff('activity-ai-handoff')">複製精簡版</button>
+              </div>
+            </div>
+            <details class="ai-handoff-preview">
+              <summary>先看精簡版內容</summary>
+              <textarea id="activity-ai-handoff" readonly>{escaped_text}</textarea>
+            </details>
+          </div>
+          <div class="ai-handoff-block">
+            <div class="ai-handoff-block-head">
+              <div>
+                <strong>完整版（含 raw data）</strong>
+                <p class="note">在精簡版之上，再加完整每公里 split，讓 AI 可以補充額外觀察。</p>
+              </div>
+              <div class="ai-handoff-actions">
+                <button class="secondary-action" type="button" onclick="copyAiHandoff('activity-ai-handoff-raw')">複製完整版</button>
+              </div>
+            </div>
+            <details class="ai-handoff-preview">
+              <summary>先看完整版內容</summary>
+              <textarea id="activity-ai-handoff-raw" readonly>{escaped_raw_text}</textarea>
+            </details>
+          </div>
+          <p class="note" id="activity-ai-handoff-status">先複製，再貼到你習慣的 AI 裡繼續聊。</p>
+        </div>
+      </section>
+    """
+
+
 def activity_review_panel(activity, split_rows, activity_rows, selected_activity_id, weekly_review=None, monthly_overview=None):
     if not activity:
         return """
@@ -4172,6 +4343,7 @@ def activity_review_panel(activity, split_rows, activity_rows, selected_activity
 
     return f"""
       {activity_selector_bar(activity_rows, selected_activity_id)}
+      {activity_ai_handoff_panel(activity, review, split_rows, weekly_review, monthly_overview)}
       <section class="panel-section">
         <h2>單堂課教練回顧</h2>
         <div class="weekly-review-grid">
@@ -7037,6 +7209,20 @@ def base_styles():
     .form-actions button:hover {
       opacity: 0.94;
     }
+    .secondary-action {
+      min-height: 40px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .secondary-action:hover {
+      background: #f7fafb;
+    }
     .inline-status-form {
       display: contents;
     }
@@ -7060,6 +7246,58 @@ def base_styles():
       background: #fff;
       color: var(--ink);
       font: inherit;
+    }
+    .ai-handoff-card {
+      display: grid;
+      gap: 12px;
+    }
+    .ai-handoff-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .ai-handoff-block {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .ai-handoff-block-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+      flex-wrap: wrap;
+    }
+    .ai-handoff-block-head > div:first-child {
+      display: grid;
+      gap: 4px;
+    }
+    .ai-handoff-block-head strong {
+      font-size: 18px;
+      line-height: 1.2;
+    }
+    .ai-handoff-preview {
+      display: grid;
+      gap: 10px;
+    }
+    .ai-handoff-preview summary {
+      cursor: pointer;
+      color: var(--ink);
+      font-weight: 800;
+    }
+    .ai-handoff-preview textarea {
+      width: 100%;
+      min-height: 280px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      resize: vertical;
     }
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -7095,11 +7333,30 @@ def base_styles():
       .scope-link-grid { grid-template-columns: 1fr; }
       .month-selector-bar { flex-direction: column; align-items: stretch; }
       .month-selector-form { width: 100%; }
+      .ai-handoff-block-head { grid-template-columns: 1fr; }
     }
     """
 
 
 def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="unassigned", message="", month="", week="", batch="1"):
+    handoff_script = """
+  <script>
+    async function copyAiHandoff(id) {
+      const el = document.getElementById(id);
+      const status = document.getElementById(id + "-status") || document.getElementById("activity-ai-handoff-status");
+      if (!el) return;
+      try {
+        await navigator.clipboard.writeText(el.value);
+        if (status) status.textContent = "已複製，現在可以直接貼到你習慣的 AI。";
+      } catch (error) {
+        el.focus();
+        el.select();
+        if (status) status.textContent = "這台瀏覽器不支援直接複製，已幫你選取內容。";
+      }
+    }
+  </script>
+"""
+
     if not DB_PATH.exists():
         return f"""<!doctype html>
 <html lang="zh-Hant">
@@ -7108,6 +7365,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Running Intelligence Platform</title>
   <style>{base_styles()}</style>
+  {handoff_script}
 </head>
 <body>
   <main>
@@ -7270,6 +7528,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Running Intelligence Platform</title>
   <style>{base_styles()}</style>
+  {handoff_script}
 </head>
 <body>
   <main>

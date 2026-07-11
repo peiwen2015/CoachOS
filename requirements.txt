@@ -1,0 +1,4 @@
+garmin-fit-sdk==21.208.0
+garminconnect>=0.2.0
+openpyxl>=3.1
+pydantic>=2.0.0

@@ -1,0 +1,166 @@
+# Running Intelligence Platform
+
+一個以跑者與教練視角設計的本機產品。
+
+它不是把 Garmin 數據換一種方式排版，而是把每一堂課、每一週、每一個月，重新整理成「值得理解」的訓練回顧。
+
+目前產品由兩個一起工作的本機小程式組成：
+
+- `RAC`：Running Analytics Converter  
+  負責 `FIT -> Excel -> SQLite`
+- `Running Intelligence Platform`  
+  負責 `Activity / Overview / Weekly / Monthly` 的教練式判讀
+
+---
+
+## 這個專案目前在做什麼
+
+Running Intelligence Platform 現在主要提供四個產品面：
+
+- `Activity`：這堂課，我真正練到了什麼？
+- `Overview`：今天，我最該關心的是什麼？
+- `Weekly`：這週，我到底練到了什麼？
+- `Monthly`：我現在在哪？
+
+`Journey` 目前保留在程式裡，但暫時不作為公開產品面。
+
+---
+
+## 本機使用方式
+
+### 1. 安裝需求
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. 啟動 RAC
+
+macOS：
+
+```text
+跑步分析資料轉檔.command
+```
+
+Windows：
+
+```text
+跑步分析資料轉檔.bat
+```
+
+或直接啟動：
+
+```bash
+python3 app.py
+```
+
+預設網址：
+
+```text
+http://127.0.0.1:8765
+```
+
+### 3. 啟動 Running Intelligence Platform
+
+```bash
+python3 analysis_platform/dashboard_app.py analysis_platform/running_analytics.sqlite
+```
+
+預設網址：
+
+```text
+http://127.0.0.1:8766
+```
+
+現在 Platform 首頁已經可以直接進入 RAC，所以日常使用會像同一套產品。
+
+---
+
+## 產品流程
+
+### Event Flow
+
+```text
+Run
+↓
+Import FIT
+↓
+Activity
+↓
+Weekly
+↓
+Monthly
+```
+
+### Routine Flow
+
+```text
+Open App
+↓
+Overview
+↓
+Weekly / Monthly / Shoes
+```
+
+---
+
+## 專案結構
+
+```text
+app.py                             RAC 本機小程式
+fit_to_excel.py                    FIT 轉 Excel 主程式
+analysis_platform/dashboard_app.py Running Intelligence Platform
+analysis_platform/running_analytics.sqlite
+                                   本機 SQLite 資料庫
+config/dropdown_options.json       下拉選單設定
+assets/                            品牌與介面圖片
+docs/                              架構、知識與產品設計文件
+```
+
+---
+
+## 資料夾說明
+
+```text
+FIT/       Garmin Original FIT 檔
+EXCEL/     轉出的 Excel 檔
+config/    下拉選單設定
+assets/    產品圖片與品牌素材
+docs/      架構與產品文件
+```
+
+---
+
+## 目前的產品狀態
+
+- `Activity`：MVP，已能作為事件入口
+- `Overview`：Beta，作為 attention surface
+- `Weekly`：Beta，進入編讀期
+- `Monthly`：Stable
+- `Shoes`：下一個待重構頁面
+
+---
+
+## 設計原則
+
+這個專案目前最核心的原則不是「先設計完整架構」，而是：
+
+> We don’t design products. We discover them.
+
+也就是：
+
+> 我們不是設計產品，而是發現產品。
+
+---
+
+## 對外發布方向
+
+這個 repo 目前準備朝一個新的公開專案整理：
+
+- 統一名稱：`Running Intelligence Platform`
+- 把 `RAC` 作為產品裡的資料入口，而不是獨立散落的小工具
+- 以 deterministic、本機可用、knowledge-first 的方式建立跑步教練產品
+
+對外 announcement 草稿可參考：
+
+[`LAUNCH_ANNOUNCEMENT.md`](/Users/perryliu/Documents/Running%20Analytics/LAUNCH_ANNOUNCEMENT.md)

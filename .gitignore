@@ -1,0 +1,25 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Personal running data
+FIT/
+EXCEL/
+config/garmin_connect.json
+*.fit
+*.xlsx
+analysis_platform/running_analytics.sqlite
+running_data.db
+Login Data
+
+# Local inspection outputs and temporary files
+tmp/
+fit_inspection*.json
+official_sdk_summary.json
+stamina_candidates.csv
+~$*
+*.bak

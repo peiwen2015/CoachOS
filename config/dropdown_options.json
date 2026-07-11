@@ -1,0 +1,99 @@
+{
+  "shoes": [
+    "Boston 13 Green",
+    "Boston 13 Blue",
+    "EVO SL",
+    "Rebel v5",
+    "Nimbus 28",
+    "HOKA Clifton 10",
+    "Boston 12",
+    "Supernova Rise 2"
+  ],
+  "workout_types": [
+    "Recovery Run（恢復跑）",
+    "Easy Run（輕鬆跑）",
+    "LSD（長距離慢跑）",
+    "Long Run（長跑）",
+    "Tempo Run（節奏跑）",
+    "Marathon Pace（馬拉松配速）",
+    "Interval（間歇）",
+    "Repetition（速度訓練）",
+    "Progression Run（漸速跑）",
+    "Fartlek（法特萊克）",
+    "Race（比賽）",
+    "Other（其他）"
+  ],
+  "training_focus": [
+    "Recovery（恢復）",
+    "Aerobic Base（有氧基礎）",
+    "Endurance（耐力）",
+    "Marathon Pace（馬拉松配速）",
+    "Threshold（乳酸閾值）",
+    "VO₂max",
+    "Speed（速度）",
+    "Neuromuscular（神經肌肉活化）",
+    "Running Economy（跑步經濟性）",
+    "Running Form（跑姿技術）",
+    "Heat Adaptation（高溫適應）",
+    "Race Simulation（比賽模擬）",
+    "Taper（減量）",
+    "Test（測驗）"
+  ],
+  "garmin_rpe": [
+    "1 - 非常輕鬆",
+    "2 - 輕鬆",
+    "3 - 中等",
+    "4 - 有點難",
+    "5 - 困難",
+    "6 - 困難",
+    "7 - 非常困難",
+    "8 - 非常困難",
+    "9 - 超級難",
+    "10 - 極限"
+  ],
+  "garmin_feel": [
+    "非常弱",
+    "弱",
+    "普通",
+    "強",
+    "非常強"
+  ],
+  "workout_focus_map": {
+    "Recovery Run（恢復跑）": [
+      "Recovery（恢復）"
+    ],
+    "Easy Run（輕鬆跑）": [
+      "Aerobic Base（有氧基礎）"
+    ],
+    "LSD（長距離慢跑）": [
+      "Endurance（耐力）"
+    ],
+    "Long Run（長跑）": [
+      "Endurance（耐力）"
+    ],
+    "Tempo Run（節奏跑）": [
+      "Threshold（乳酸閾值）"
+    ],
+    "Marathon Pace（馬拉松配速）": [
+      "Marathon Pace（馬拉松配速）"
+    ],
+    "Interval（間歇）": [
+      "VO₂max"
+    ],
+    "Repetition（速度訓練）": [
+      "Speed（速度）"
+    ],
+    "Progression Run（漸速跑）": [
+      "Endurance（耐力）"
+    ],
+    "Fartlek（法特萊克）": [
+      "VO₂max",
+      "Speed（速度）"
+    ],
+    "Race（比賽）": [
+      "Race Simulation（比賽模擬）",
+      "Test（測驗）"
+    ],
+    "Other（其他）": []
+  }
+}

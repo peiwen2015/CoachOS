@@ -1046,6 +1046,9 @@ def activity_review_payload(activity, split_rows):
     else:
         why = "這堂課真正重要的，不是數字漂不漂亮，而是它有沒有替整體節奏留下東西。"
 
+    last_split_index = split_rows[-1]["split_index"] if split_rows else None
+    middle_split_index = split_rows[len(split_rows) // 2]["split_index"] if len(split_rows) >= 3 else last_split_index
+
     cards = []
     if split_rows:
         if pace_change is not None:
@@ -1058,7 +1061,14 @@ def activity_review_payload(activity, split_rows):
         else:
             pace_label = "節奏待補"
             pace_note = "目前還沒有足夠 split 可以比較前後段。"
-        cards.append(("節奏反應", pace_label, pace_note))
+        cards.append({
+            "title": "節奏反應",
+            "value": pace_label,
+            "note": pace_note,
+            "fragment_anchor": "#fragment-finish",
+            "evidence_anchor": f"#split-{last_split_index}" if last_split_index is not None else "#activity-evidence",
+            "segment_label": "收尾狀態",
+        })
 
     if training_load:
         load_label = f"負荷 {format_number(training_load, 0)}"
@@ -1068,7 +1078,14 @@ def activity_review_payload(activity, split_rows):
             load_note = "這堂課本身的刺激不低，重點是之後怎麼承接。"
         else:
             load_note = "今天的刺激不算高，判讀更要看它放回整體節奏後的意義。"
-        cards.append(("刺激份量", load_label, load_note))
+        cards.append({
+            "title": "刺激份量",
+            "value": load_label,
+            "note": load_note,
+            "fragment_anchor": "#fragment-middle",
+            "evidence_anchor": f"#split-{middle_split_index}" if middle_split_index is not None else "#activity-evidence",
+            "segment_label": "中段反應",
+        })
 
     if is_hot or stamina_drop is not None or hr_change is not None:
         body_parts = []
@@ -1080,7 +1097,14 @@ def activity_review_payload(activity, split_rows):
             body_parts.append(f"HR {format_number(hr_change, 0)} bpm")
         body_label = " · ".join(body_parts) if body_parts else "身體有回應"
         body_note = "環境與身體回應一起決定了今天該怎麼理解，不只是看配速。"
-        cards.append(("身體訊號", body_label, body_note))
+        cards.append({
+            "title": "身體訊號",
+            "value": body_label,
+            "note": body_note,
+            "fragment_anchor": "#fragment-middle",
+            "evidence_anchor": f"#split-{middle_split_index}" if middle_split_index is not None else "#activity-evidence",
+            "segment_label": "中段反應",
+        })
 
     evidence_intro = "我會這樣看，不是因為單一數字，而是因為這堂課的節奏、刺激與身體回應指向同一個學習。"
 
@@ -1093,6 +1117,12 @@ def activity_review_payload(activity, split_rows):
         "looking_forward": reminder,
         "evidence_intro": evidence_intro,
         "cards": cards[:3],
+        "reasoning_steps": [
+            ("先看學習", "#activity-learning"),
+            ("再看形成原因", "#activity-cause"),
+            ("再看關鍵片段", "#activity-segments"),
+            ("最後回到證據", "#activity-evidence"),
+        ],
     }
 
 
@@ -2429,7 +2459,8 @@ def splits(connection, activity_id):
             split_distance_m,
             elapsed_pace_sec_per_km,
             avg_hr,
-            avg_power_w
+            avg_power_w,
+            avg_cadence_spm
         FROM kilometer_split_view
         WHERE activity_id = ?
         ORDER BY split_index
@@ -3684,49 +3715,56 @@ def monthly_key_sessions_table(rows):
     """
 
 
-def activity_fragment_table(activity, split_rows):
+def activity_key_segments(split_rows):
     if not split_rows:
-        return '<p class="note">目前還沒有足夠的 split 可以建立關鍵片段。</p>'
-
+        return []
     rows = []
     first = split_rows[0]
     last = split_rows[-1]
-    rows.append(
-        (
-            "起跑節奏",
-            f"KM {first['split_index']}",
-            f"配速 {format_pace_seconds(first['elapsed_pace_sec_per_km']) or '—'} · HR {'' if first['avg_hr'] is None else int(round(first['avg_hr']))}",
-            "先看這堂課一開始是怎麼進入今天的節奏。",
-        )
-    )
+    rows.append({
+        "anchor": "fragment-start",
+        "label": "起跑節奏",
+        "section": f"KM {first['split_index']}",
+        "metric": f"配速 {format_pace_seconds(first['elapsed_pace_sec_per_km']) or '—'} · HR {'' if first['avg_hr'] is None else int(round(first['avg_hr']))}",
+        "note": "先看這堂課一開始是怎麼進入今天的節奏。",
+        "split_anchor": f"split-{first['split_index']}",
+    })
     if len(split_rows) >= 3:
         middle = split_rows[len(split_rows) // 2]
-        rows.append(
-            (
-                "中段反應",
-                f"KM {middle['split_index']}",
-                f"配速 {format_pace_seconds(middle['elapsed_pace_sec_per_km']) or '—'} · HR {'' if middle['avg_hr'] is None else int(round(middle['avg_hr']))}",
-                "中段通常最能看出刺激有沒有真正成立。",
-            )
-        )
-    rows.append(
-        (
-            "收尾狀態",
-            f"KM {last['split_index']}",
-            f"配速 {format_pace_seconds(last['elapsed_pace_sec_per_km']) or '—'} · HR {'' if last['avg_hr'] is None else int(round(last['avg_hr']))}",
-            "最後一段最能看出今天留下來的是節奏、耐力，還是單純把課表做完。",
-        )
-    )
+        rows.append({
+            "anchor": "fragment-middle",
+            "label": "中段反應",
+            "section": f"KM {middle['split_index']}",
+            "metric": f"配速 {format_pace_seconds(middle['elapsed_pace_sec_per_km']) or '—'} · HR {'' if middle['avg_hr'] is None else int(round(middle['avg_hr']))}",
+            "note": "中段通常最能看出刺激有沒有真正成立。",
+            "split_anchor": f"split-{middle['split_index']}",
+        })
+    rows.append({
+        "anchor": "fragment-finish",
+        "label": "收尾狀態",
+        "section": f"KM {last['split_index']}",
+        "metric": f"配速 {format_pace_seconds(last['elapsed_pace_sec_per_km']) or '—'} · HR {'' if last['avg_hr'] is None else int(round(last['avg_hr']))}",
+        "note": "最後一段最能看出今天留下來的是節奏、耐力，還是單純把課表做完。",
+        "split_anchor": f"split-{last['split_index']}",
+    })
+    return rows
+
+
+def activity_fragment_table(activity, split_rows):
+    rows = activity_key_segments(split_rows)
+    if not rows:
+        return '<p class="note">目前還沒有足夠的 split 可以建立關鍵片段。</p>'
 
     body = []
-    for label, section, metric, note in rows:
+    for row in rows:
         body.append(
             f"""
-            <tr>
-              <td>{html.escape(label)}</td>
-              <td>{html.escape(section)}</td>
-              <td>{html.escape(metric)}</td>
-              <td>{html.escape(note)}</td>
+            <tr id="{html.escape(row['anchor'], quote=True)}">
+              <td>{html.escape(row['label'])}</td>
+              <td>{html.escape(row['section'])}</td>
+              <td>{html.escape(row['metric'])}</td>
+              <td>{html.escape(row['note'])}</td>
+              <td><a class="inline-jump-link" href="#{html.escape(row['split_anchor'], quote=True)}">看這段證據</a></td>
             </tr>
             """
         )
@@ -3739,6 +3777,7 @@ def activity_fragment_table(activity, split_rows):
               <th>片段</th>
               <th>數據</th>
               <th>為什麼重要</th>
+              <th>往下看</th>
             </tr>
           </thead>
           <tbody>{"".join(body)}</tbody>
@@ -3747,12 +3786,21 @@ def activity_fragment_table(activity, split_rows):
     """
 
 
-def activity_driver_card(title, value, note):
+def activity_driver_card(title, value, note, fragment_anchor=None, evidence_anchor=None, segment_label=None):
+    footer = ""
+    if fragment_anchor or evidence_anchor:
+        links = []
+        if fragment_anchor:
+            links.append(f'<a class="inline-jump-link" href="{html.escape(fragment_anchor, quote=True)}">先看{html.escape(segment_label or "關鍵片段")}</a>')
+        if evidence_anchor:
+            links.append(f'<a class="inline-jump-link" href="{html.escape(evidence_anchor, quote=True)}">再看證據</a>')
+        footer = f'<div class="reasoning-jump-row">{"".join(links)}</div>'
     return f"""
       <div class="review-card briefing-chart-card">
         <span>{html.escape(title)}</span>
         <strong>{html.escape(value)}</strong>
         <p>{html.escape(note)}</p>
+        {footer}
       </div>
     """
 
@@ -3801,14 +3849,16 @@ def activity_split_table(split_rows):
         return '<p class="note">目前還沒有每公里 split 可以往下看。</p>'
     body = []
     for row in split_rows:
+        cadence = "" if row["avg_cadence_spm"] is None else format_number(row["avg_cadence_spm"], 1)
         body.append(
             f"""
-            <tr>
+            <tr id="split-{row["split_index"]}">
               <td>{row["split_index"]}</td>
               <td>{format_number((row["split_distance_m"] or 0) / 1000, 2)}</td>
               <td>{html.escape(format_pace_seconds(row["elapsed_pace_sec_per_km"]))}</td>
               <td>{'' if row["avg_hr"] is None else int(round(row["avg_hr"]))}</td>
               <td>{'' if row["avg_power_w"] is None else int(round(row["avg_power_w"]))}</td>
+              <td>{html.escape(cadence)}</td>
             </tr>
             """
         )
@@ -3822,6 +3872,7 @@ def activity_split_table(split_rows):
               <th>配速</th>
               <th>HR</th>
               <th>功率</th>
+              <th>步頻</th>
             </tr>
           </thead>
           <tbody>{"".join(body)}</tbody>
@@ -3880,10 +3931,13 @@ def activity_review_panel(activity, split_rows, activity_rows, selected_activity
               </div>
               <span class="status-badge balanced">{html.escape(workout_name)}</span>
             </div>
-            <div class="coach-summary review-summary">
+            <div class="coach-summary review-summary" id="activity-learning">
               <span>先回答一件事</span>
               <strong>{html.escape(review["learning_question"])}</strong>
               <p>{html.escape(review["learning"])}</p>
+              <div class="reasoning-jump-row">
+                {"".join(f'<a class="inline-jump-link" href="{html.escape(href, quote=True)}">{html.escape(label)}</a>' for label, href in review["reasoning_steps"])}
+              </div>
             </div>
             <div class="coach-summary review-summary">
               <span>這堂課真正留下來的</span>
@@ -3909,19 +3963,20 @@ def activity_review_panel(activity, split_rows, activity_rows, selected_activity
           </div>
         </div>
       </section>
-      <section class="panel-section">
+      <section class="panel-section" id="activity-cause">
         <h2>什麼真正讓你學會了這件事？</h2>
         <p class="note">{html.escape(review["evidence_intro"])}</p>
         <div class="metric-grid training-kpi-grid briefing-evidence-grid">
-          {"".join(activity_driver_card(title, value, note) for title, value, note in review["cards"])}
+          {"".join(activity_driver_card(card["title"], card["value"], card["note"], card.get("fragment_anchor"), card.get("evidence_anchor"), card.get("segment_label")) for card in review["cards"])}
         </div>
       </section>
-      <section class="panel-section">
+      <section class="panel-section" id="activity-segments">
         <h2>教練看了哪些關鍵片段</h2>
+        <p class="note">先看教練停在哪幾段，再一路往下核對那一段的實際 split。</p>
         {activity_fragment_table(activity, split_rows)}
       </section>
       {activity_facts_panel(activity)}
-      <section class="panel-section">
+      <section class="panel-section" id="activity-evidence">
         <h2>完整 split</h2>
         <p class="note">如果你想自己驗證教練剛剛為什麼這樣看，完整每公里資料放在這裡。</p>
         {activity_split_table(split_rows)}
@@ -5473,6 +5528,11 @@ def base_styles():
       background: #fff;
       box-shadow: 0 8px 22px rgba(31, 41, 51, 0.05);
     }
+    .table-wrap tr:target {
+      background: #fff8ef;
+      outline: 2px solid #f3c7ae;
+      outline-offset: -2px;
+    }
     table {
       width: 100%;
       min-width: 560px;
@@ -5961,6 +6021,31 @@ def base_styles():
     }
     .review-summary {
       min-height: 0;
+    }
+    .reasoning-jump-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 2px;
+    }
+    .inline-jump-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      padding: 0 10px;
+      border-radius: 999px;
+      border: 1px solid #cfe1ed;
+      background: #f8fbfd;
+      color: #0f766e;
+      font-size: 13px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .inline-jump-link:hover {
+      background: #eef6fb;
+      border-color: #b6d2e2;
     }
     .weekly-review-side {
       align-content: start;

@@ -2082,6 +2082,7 @@ def overview_attention_payload(connection):
             "cta": "回顧本週學到了什麼",
             "href": "/?" + urlencode({"page": "weekly"}),
             "secondary_note": None,
+            "target_surface": "weekly",
         }
 
     primary = ranked[0]
@@ -2115,7 +2116,96 @@ def overview_attention_payload(connection):
         "cta": cta,
         "href": href,
         "secondary_note": secondary_note,
+        "target_surface": primary.target_surface,
     }
+
+
+def overview_reasoning_route_panel(attention, weekly_review, monthly_overview, latest_activity):
+    if not attention:
+        return ""
+
+    latest_activity_href = None
+    latest_activity_line = ""
+    if latest_activity:
+        latest_activity_href = "/?" + urlencode({"page": "activity", "activity": latest_activity["activity_id"]})
+        latest_activity_line = (
+            f"{format_short_datetime(latest_activity['activity_start_time'])} · "
+            f"{format_number(latest_activity['distance_km'], 2)} km"
+        )
+
+    routes = []
+    target_surface = attention.get("target_surface") or "weekly"
+    if target_surface == "monthly":
+        routes.append({
+            "label": "第一步",
+            "title": "先看月回顧",
+            "body": monthly_overview["verdict_reason"] if monthly_overview else "先確認你現在位於哪個訓練位置。",
+            "href": "/?" + urlencode({"page": "monthly"}),
+        })
+        routes.append({
+            "label": "第二步",
+            "title": "再看本週怎麼接",
+            "body": weekly_review["focus"] if weekly_review else "再確認這一週有沒有把這個方向接住。",
+            "href": "/?" + urlencode({"page": "weekly"}),
+        })
+        if latest_activity_href:
+            routes.append({
+                "label": "第三步",
+                "title": "最後回到單堂課",
+                "body": f"如果想一路追到底，就回到最近那堂課：{latest_activity_line}",
+                "href": latest_activity_href,
+            })
+    elif target_surface == "shoes":
+        routes.append({
+            "label": "第一步",
+            "title": "先看鞋款頁",
+            "body": "先確認今天需要留意的是哪雙鞋，以及目前鞋款資料夠不夠乾淨。",
+            "href": "/?" + urlencode({"page": "shoes"}),
+        })
+        routes.append({
+            "label": "第二步",
+            "title": "必要時回到資料標註",
+            "body": "如果鞋款判讀還不夠乾淨，再補鞋款與課表標註。",
+            "href": "/?" + urlencode({"page": "metadata"}),
+        })
+    else:
+        routes.append({
+            "label": "第一步",
+            "title": "先看週回顧",
+            "body": weekly_review["focus"] if weekly_review else "先確認這週真正留下來的學習是什麼。",
+            "href": "/?" + urlencode({"page": "weekly"}),
+        })
+        if latest_activity_href:
+            routes.append({
+                "label": "第二步",
+                "title": "再追到那堂關鍵課",
+                "body": f"如果想知道這個學習是怎麼長出來的，就回到最近那堂課：{latest_activity_line}",
+                "href": latest_activity_href,
+            })
+        routes.append({
+            "label": "第三步",
+            "title": "最後回到月位置",
+            "body": monthly_overview["verdict_reason"] if monthly_overview else "最後再確認這週學習放回整個月後，方向有沒有對齊。",
+            "href": "/?" + urlencode({"page": "monthly"}),
+        })
+
+    return f"""
+      <section class="panel-section">
+        <h2>如果你要一路追下去</h2>
+        <div class="coach-desk-route-grid">
+          {"".join(
+              f'''
+              <a class="coach-route-card" href="{html.escape(route["href"], quote=True)}">
+                <span>{html.escape(route["label"])}</span>
+                <strong>{html.escape(route["title"])}</strong>
+                <p>{html.escape(route["body"])}</p>
+              </a>
+              '''
+              for route in routes
+          )}
+        </div>
+      </section>
+    """
 
 
 def coach_desk_focus_route(today, weekly_review, monthly_overview, story, latest_activity):
@@ -2166,9 +2256,17 @@ def coach_desk_panel(attention, weekly_review, monthly_overview, monthly_review,
 
     weekly_href = "/?" + urlencode({"page": "weekly"})
     monthly_href = "/?" + urlencode({"page": "monthly"})
+    activity_href = "/?" + urlencode({"page": "activity", "activity": latest_activity["activity_id"]}) if latest_activity else ""
 
     weekly_line = weekly_review["focus"] if weekly_review else "先讓這週的節奏說話。"
     monthly_line = first_sentence(monthly_review["coach_summary"]) if monthly_review else "先把這個月的方向看清楚。"
+    activity_line = ""
+    if latest_activity:
+        activity_line = (
+            f"{format_short_datetime(latest_activity['activity_start_time'])} · "
+            f"{format_number(latest_activity['distance_km'], 2)} km · "
+            f"{format_pace_seconds(latest_activity['avg_pace_sec_per_km'])}"
+        )
     evidence_html = ""
     if attention["evidence"]:
         evidence_html = "<ul class=\"coach-attention-evidence\">" + "".join(
@@ -2193,6 +2291,13 @@ def coach_desk_panel(attention, weekly_review, monthly_overview, monthly_review,
       <section class="panel-section">
         <h2>今天可以從這裡往下看</h2>
         <div class="coach-desk-route-grid">
+          {f'''
+          <a class="coach-route-card" href="{html.escape(activity_href, quote=True)}">
+            <span>單堂課</span>
+            <strong>剛剛那堂課留下了什麼</strong>
+            <p>{html.escape(activity_line)}</p>
+          </a>
+          ''' if latest_activity else ""}
           <a class="coach-route-card" href="{html.escape(weekly_href, quote=True)}">
             <span>週回顧</span>
             <strong>本週學到了什麼</strong>
@@ -2205,6 +2310,7 @@ def coach_desk_panel(attention, weekly_review, monthly_overview, monthly_review,
           </a>
         </div>
       </section>
+      {overview_reasoning_route_panel(attention, weekly_review, monthly_overview, latest_activity)}
     """    
 
 

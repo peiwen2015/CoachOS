@@ -4397,14 +4397,6 @@ def shoe_kpi_card(label, value, subtext=""):
 
 
 def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, message=""):
-    if not rows:
-        return """
-        <section class="panel-section">
-          <h2>鞋款</h2>
-          <p class="note">目前還沒有鞋款資料。</p>
-        </section>
-        """
-
     used_rows = [row for row in rows if (row["run_count"] or 0) > 0]
     active_rows = [row for row in rows if row["is_active"]]
     tagged_rows = [row for row in intelligence_rows if (row["tagged_activity_count"] or 0) > 0]
@@ -4625,6 +4617,9 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, message
         if not has_tracked_shoes
         else "新增目前在用的鞋款後，歷史活動就能開始補標，鞋款判讀也會一起變乾淨。"
     )
+    empty_note_html = ""
+    if not rows:
+        empty_note_html = '<p class="note">目前還沒有鞋款資料，先從新增你現在在用的鞋開始。</p>'
 
     return f"""
       {message_html}
@@ -4643,6 +4638,7 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, message
               <span>為什麼先補鞋款</span>
               <p>{html.escape(add_shoe_help)}</p>
             </div>
+            {empty_note_html}
             <form method="post" action="/shoes/add" class="metadata-form">
               <label>
                 <span>鞋款名稱</span>

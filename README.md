@@ -6,7 +6,7 @@
 
 目前產品由兩個一起工作的本機小程式組成：
 
-- `RAC`：Running Analytics Converter  
+- `資料匯入工具`  
   負責 `FIT -> Excel -> SQLite`
 - `Running Intelligence Platform`  
   負責 `Activity / Overview / Weekly / Monthly` 的教練式判讀
@@ -48,7 +48,7 @@ Windows：
 Running Intelligence Platform.bat
 ```
 
-雙擊後會先打開平台首頁；需要轉檔與匯入時，再從首頁進入 RAC。
+雙擊後會先打開平台首頁；需要轉檔與匯入時，再從首頁進入資料匯入工具。
 
 或直接啟動平台：
 
@@ -62,7 +62,7 @@ python3 analysis_platform/dashboard_app.py analysis_platform/running_analytics.s
 http://127.0.0.1:8766
 ```
 
-### 3. 直接啟動 RAC（資料轉檔工具）
+### 3. 直接啟動資料匯入工具
 
 如果你只想單獨開資料轉檔工具，也可以直接啟動：
 
@@ -76,7 +76,7 @@ python3 app.py
 http://127.0.0.1:8765
 ```
 
-現在 Platform 首頁已經可以直接進入 RAC，所以日常使用會像同一套產品。
+現在 Platform 首頁已經可以直接進入資料匯入工具，所以日常使用會像同一套產品。
 
 ---
 
@@ -111,7 +111,7 @@ Weekly / Monthly / Shoes
 ## 專案結構
 
 ```text
-app.py                             RAC 本機小程式
+app.py                             資料匯入工具
 fit_to_excel.py                    FIT 轉 Excel 主程式
 analysis_platform/dashboard_app.py Running Intelligence Platform
 analysis_platform/running_analytics.sqlite
@@ -162,7 +162,7 @@ docs/      架構與產品文件
 這個 repo 目前準備朝一個新的公開專案整理：
 
 - 統一名稱：`Running Intelligence Platform`
-- 把 `RAC` 作為產品裡的資料入口，而不是獨立散落的小工具
+- 把資料匯入工具作為產品裡的資料入口，而不是獨立散落的小工具
 - 以 deterministic、本機可用、knowledge-first 的方式建立跑步教練產品
 
 對外 announcement 草稿可參考：

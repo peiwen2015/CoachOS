@@ -43,6 +43,7 @@ GARMIN_CONFIG_PATH = ROOT / "config" / "garmin_connect.json"
 SQLITE_DB_PATH = ROOT / "analysis_platform" / "running_analytics.sqlite"
 HOST = "127.0.0.1"
 PORT = 8765
+PLATFORM_URL = "http://127.0.0.1:8766/"
 EXCEL_FORMAT_VERSION = WORKBOOK_VERSION_NAME
 EXCEL_SCHEMA_LABEL = EXCEL_FORMAT_VERSION.replace("跑步分析資料 ", "Excel Schema ")
 DEFAULT_FIT_LIST_LIMIT = 30
@@ -1172,15 +1173,15 @@ def workout_focus_reference_table(dropdown_options):
     """
 
 
-def product_banner(title="跑步分析資料轉檔"):
+def product_banner(title="FIT 匯入與資料整理"):
     return f"""
       <section class="product-banner">
         <div class="banner-copy">
           <div class="brand-row">
-            <img class="brand-mark" src="/assets/rac_mark_transparent.png" alt="RAC">
+            <img class="brand-mark" src="/assets/rac_mark_transparent.png" alt="資料匯入工具">
             <div>
               <h1>{html.escape(title)}</h1>
-              <p class="brand-subtitle">RUNNING ANALYTICS CONVERTER</p>
+              <p class="brand-subtitle">FIT IMPORT & DATA PREP</p>
             </div>
           </div>
           <p class="banner-subtitle">Garmin FIT -> Standardized Excel -> AI Coach Analysis</p>
@@ -1191,10 +1192,6 @@ def product_banner(title="跑步分析資料轉檔"):
             <span>Long-term Analytics</span>
           </div>
           <p class="banner-note">將 Garmin FIT 活動檔轉換為固定格式 Excel，支援每日 AI 教練分析、週/月趨勢與長期跑步資料庫。</p>
-        </div>
-        <div class="version-panel">
-          <span>App v{html.escape(APP_VERSION)}</span>
-          <span>{html.escape(EXCEL_SCHEMA_LABEL)}</span>
         </div>
       </section>
     """
@@ -1211,6 +1208,7 @@ def nav(active="convert"):
         <a class="nav-link{download_class}" href="/download-fit">下載 FIT</a>
         <a class="nav-link{batch_class}" href="/batch-convert">批次轉檔</a>
         <a class="nav-link{options_class}" href="/options">下拉選單設定</a>
+        <a class="nav-link nav-link-secondary" href="{html.escape(PLATFORM_URL, quote=True)}">回分析平台</a>
       </nav>
     """
 
@@ -1338,32 +1336,6 @@ def base_styles():
       content: "-> ";
       opacity: 0.68;
     }
-    .version {
-      display: inline-block;
-      margin-left: 8px;
-      color: var(--muted);
-      font-size: 14px;
-      font-weight: 500;
-    }
-    .version-panel {
-      display: grid;
-      gap: 8px;
-      min-width: 180px;
-      justify-items: end;
-      position: relative;
-      z-index: 1;
-    }
-    .version-panel span {
-      display: inline-flex;
-      color: #fff;
-      background: rgba(255, 255, 255, 0.16);
-      border: 1px solid rgba(255, 255, 255, 0.24);
-      border-radius: 999px;
-      padding: 8px 11px;
-      font-size: 13px;
-      font-weight: 800;
-      white-space: nowrap;
-    }
     nav {
       display: flex;
       width: fit-content;
@@ -1385,6 +1357,10 @@ def base_styles():
     .nav-link.active {
       color: #fff;
       background: var(--accent-dark);
+    }
+    .nav-link-secondary {
+      color: var(--accent-dark);
+      background: rgba(15, 118, 110, 0.08);
     }
     form {
       background: var(--surface);
@@ -1626,10 +1602,6 @@ def base_styles():
       }
       .product-banner h1 { font-size: 30px; }
       .brand-subtitle { font-size: 14px; }
-      .version-panel {
-        justify-items: start;
-        grid-template-columns: repeat(2, minmax(0, auto));
-      }
       form { padding: 16px; }
       .grid { grid-template-columns: 1fr; }
       label.wide { grid-column: span 1; }
@@ -1660,7 +1632,7 @@ def render_page(message="", error="", selected_fit=""):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>跑步分析資料轉檔</title>
+  <title>FIT 匯入與資料整理</title>
   <style>
     {base_styles()}
   </style>

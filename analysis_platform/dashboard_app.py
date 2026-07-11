@@ -2178,7 +2178,7 @@ def ensure_rac_running():
 
 def rac_entry_panel():
     href = "/open-rac"
-    status = "RAC 已就緒" if rac_is_running() else "從這裡進入資料轉檔與匯入"
+    status = "資料匯入工具已就緒" if rac_is_running() else "從這裡進入 FIT 匯入與資料整理"
     note = (
         "把 FIT 轉成 Excel、補活動資訊、寫回 SQLite，然後再回到 Running Intelligence Platform 繼續看 Activity、Weekly、Monthly。"
     )
@@ -2186,11 +2186,11 @@ def rac_entry_panel():
       <section class="panel-section">
         <h2>資料入口</h2>
         <div class="coach-attention-card">
-          <span>RAC 小程式</span>
-          <strong>先進入轉檔與匯入</strong>
+          <span>資料匯入工具</span>
+          <strong>先進入 FIT 匯入與資料整理</strong>
           <p>{html.escape(note)}</p>
           <div class="coach-attention-footer">
-            <a class="desk-link" href="{html.escape(href, quote=True)}">進入 RAC</a>
+            <a class="desk-link" href="{html.escape(href, quote=True)}">進入資料匯入工具</a>
             <small>{html.escape(status)}</small>
           </div>
         </div>
@@ -2205,14 +2205,14 @@ def no_data_yet_panel():
         <div class="coach-attention-card no-focus">
           <span>第一次使用</span>
           <strong>目前還沒有跑步資料</strong>
-          <p>這不是錯誤。先進入 RAC 匯入第一批 FIT，平台就會開始長出 Activity、Weekly、Monthly 與 Overview。</p>
+          <p>這不是錯誤。先進入資料匯入工具匯入第一批 FIT，平台就會開始長出 Activity、Weekly、Monthly 與 Overview。</p>
           <ul class="coach-attention-evidence">
             <li>先選一個或幾個 FIT 檔</li>
             <li>轉成 Excel 並寫回 SQLite</li>
             <li>回到平台重新整理，就能開始看教練式回顧</li>
           </ul>
           <div class="coach-attention-footer">
-            <a class="desk-link" href="/open-rac">先進入 RAC</a>
+            <a class="desk-link" href="/open-rac">先進入資料匯入工具</a>
             <small>第一批資料匯入後，首頁會自動變成真正的 Overview。</small>
           </div>
         </div>
@@ -5276,7 +5276,7 @@ def metadata_page_panel(
             <div class="review-card">
               <span>退役鞋款</span>
               <strong>可補標</strong>
-              <p>只要 RAC 下拉選單有的鞋，都能用來補歷史資料</p>
+              <p>只要資料匯入工具下拉選單有的鞋，都能用來補歷史資料</p>
             </div>
           </div>
         </div>
@@ -6944,7 +6944,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_html(
                 render_dashboard(
                     page="home",
-                    message="RAC 目前沒有成功啟動，請稍後再試一次。",
+                    message="資料匯入工具目前沒有成功啟動，請稍後再試一次。",
                 ),
                 status=503,
             )

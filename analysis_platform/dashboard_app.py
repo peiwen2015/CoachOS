@@ -961,6 +961,11 @@ def weekly_review_payload(weekly, intelligence):
         "looking_forward": looking_forward,
         "cause_question": "什麼真正讓你學會了這件事？",
         "evidence_intro": evidence_intro,
+        "reasoning_steps": [
+            ("先看學習", "#weekly-learning"),
+            ("再看形成原因", "#weekly-cause"),
+            ("再看關鍵課", "#weekly-key-activities"),
+        ],
     }
 
 
@@ -3602,6 +3607,9 @@ def weekly_learning_driver_card(intelligence, distribution_rows):
           {driver_row("刺激安排", stimulus_level_value, stimulus_note)}
         </div>
         <p>{html.escape(summary)}</p>
+        <div class="reasoning-jump-row">
+          <a class="inline-jump-link" href="#weekly-key-activities">去看關鍵課</a>
+        </div>
       </div>
     """
 
@@ -3657,6 +3665,9 @@ def weekly_structure_card(distribution_rows):
           {"".join(items)}
         </div>
         <p>{html.escape(insight)}</p>
+        <div class="reasoning-jump-row">
+          <a class="inline-jump-link" href="#weekly-key-activities">再看是哪幾堂課留下來的</a>
+        </div>
       </div>
     """
 
@@ -3690,6 +3701,7 @@ def monthly_key_sessions_table(rows):
               <td>{'' if row["avg_hr"] is None else int(round(row["avg_hr"]))}</td>
               <td>{'' if row["training_load"] is None else format_number(row["training_load"], 1)}</td>
               <td>{html.escape(str(row["shoe_display_name"] or ""))}</td>
+              <td>{f'<a class="inline-jump-link" href="/?page=activity&activity_id={int(row["activity_id"])}">看這堂課</a>' if row["activity_id"] else ''}</td>
             </tr>
             """
         )
@@ -3707,6 +3719,7 @@ def monthly_key_sessions_table(rows):
               <th>HR</th>
               <th>負荷</th>
               <th>鞋款</th>
+              <th>往下看</th>
             </tr>
           </thead>
           <tbody>{"".join(body)}</tbody>
@@ -4380,10 +4393,13 @@ def weekly_review_panel(weekly, intelligence, history_rows, distribution_rows, k
               </div>
               {recovery_badge(intelligence["recovery_status"])}
             </div>
-            <div class="coach-summary review-summary">
+            <div class="coach-summary review-summary" id="weekly-learning">
               <span>先回答一件事</span>
               <strong>{html.escape(review["learning_question"])}</strong>
               <p>{html.escape(review["learning"])}</p>
+              <div class="reasoning-jump-row">
+                {"".join(f'<a class="inline-jump-link" href="{html.escape(href, quote=True)}">{html.escape(label)}</a>' for label, href in review["reasoning_steps"])}
+              </div>
             </div>
             <div class="coach-summary review-summary">
               <span>這週最大的收穫</span>
@@ -4415,15 +4431,16 @@ def weekly_review_panel(weekly, intelligence, history_rows, distribution_rows, k
           </div>
         </div>
       </section>
-      <section class="panel-section">
+      <section class="panel-section" id="weekly-cause">
         <h2>教練怎麼理解這週</h2>
         <p class="note">{html.escape(review["evidence_intro"])}</p>
         <div class="metric-grid training-kpi-grid briefing-evidence-grid">
           {"".join(evidence_cards)}
         </div>
       </section>
-      <section class="panel-section">
+      <section class="panel-section" id="weekly-key-activities">
         <h2>教練看了哪些關鍵課</h2>
+        <p class="note">這裡不是列出全部活動，而是列出最能解釋這週學習是怎麼長出來的那幾堂課。</p>
         {monthly_key_sessions_table(key_session_rows)}
       </section>
       <section class="panel-section">

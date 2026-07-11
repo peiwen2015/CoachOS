@@ -34,33 +34,23 @@ Running Intelligence Platform 現在主要提供四個產品面：
 pip install -r requirements.txt
 ```
 
-### 2. 啟動 RAC
+### 2. 啟動 Running Intelligence Platform
 
 macOS：
 
 ```text
-跑步分析資料轉檔.command
+Running Intelligence Platform.command
 ```
 
 Windows：
 
 ```text
-跑步分析資料轉檔.bat
+Running Intelligence Platform.bat
 ```
 
-或直接啟動：
+雙擊後會先打開平台首頁；需要轉檔與匯入時，再從首頁進入 RAC。
 
-```bash
-python3 app.py
-```
-
-預設網址：
-
-```text
-http://127.0.0.1:8765
-```
-
-### 3. 啟動 Running Intelligence Platform
+或直接啟動平台：
 
 ```bash
 python3 analysis_platform/dashboard_app.py analysis_platform/running_analytics.sqlite
@@ -70,6 +60,20 @@ python3 analysis_platform/dashboard_app.py analysis_platform/running_analytics.s
 
 ```text
 http://127.0.0.1:8766
+```
+
+### 3. 直接啟動 RAC（資料轉檔工具）
+
+如果你只想單獨開資料轉檔工具，也可以直接啟動：
+
+```bash
+python3 app.py
+```
+
+預設網址：
+
+```text
+http://127.0.0.1:8765
 ```
 
 現在 Platform 首頁已經可以直接進入 RAC，所以日常使用會像同一套產品。

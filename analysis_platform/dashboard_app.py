@@ -4080,6 +4080,208 @@ def weekly_ai_handoff_panel(weekly, intelligence, review, distribution_rows, key
     """
 
 
+def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_rows, key_session_rows, related_week_rows, coach_memory=None, include_raw_data=False):
+    if not monthly or not intelligence:
+        return ""
+
+    progress_pct = progress_row["progress_pct"] if progress_row else None
+    quality_sessions = int(progress_row["current_quality_sessions"] or 0) if progress_row else 0
+    long_runs = int(progress_row["current_long_runs"] or 0) if progress_row else 0
+
+    if quality_sessions >= 3:
+        phase = "品質建構"
+    elif long_runs >= 2:
+        phase = "耐力累積"
+    elif quality_sessions >= 1:
+        phase = "平衡建構"
+    else:
+        phase = "基礎累積"
+
+    if intelligence["is_partial_month"]:
+        verdict = "正常"
+        verdict_reason = (
+            f"目前仍屬於正常累積。因為本月只完成 {format_number(progress_pct, 0)}%，"
+            "目前負荷與里程都還在可接受區間，月底再做完整評估即可。"
+        )
+    elif intelligence["load_delta"] is not None and intelligence["load_delta"] < -15:
+        verdict = "吸收月"
+        verdict_reason = "本月整體偏向吸收與調整，負荷低於近期平均，但方向仍然合理。"
+    elif intelligence["load_delta"] is not None and intelligence["load_delta"] > 15:
+        verdict = "負荷建構"
+        verdict_reason = "本月負荷高於近期平均，代表正處於明顯的建構期，恢復品質會變得更重要。"
+    else:
+        verdict = "平衡建構"
+        verdict_reason = "本月方向整體平衡，里程、品質課與長跑配置都還在合理範圍內。"
+
+    letter = monthly_letter_payload(monthly, intelligence, verdict, phase, progress_pct)
+    why_points = monthly_briefing_why_points(monthly, intelligence, progress_row, coach_memory)
+
+    week_lines = [
+        "- {period}：{verdict}；活動 {activities}；{km} km；負荷 {load}；{note}".format(
+            period=f"{row['start_date']} – {row['end_date']}",
+            verdict=str(row["verdict"] or "本週"),
+            activities=row["activities"],
+            km=format_number(row["total_km"], 2) or "—",
+            load=format_number(row["training_load"], 1) or "—",
+            note=str(row["note"] or ""),
+        )
+        for row in related_week_rows or []
+    ]
+
+    key_session_lines = []
+    session_label_map = {
+        "Longest Run": "最長一課",
+        "Highest Load": "最高負荷",
+        "Fastest Quality": "最快品質課",
+        "Lowest HR Easy": "最低心率輕鬆跑",
+    }
+    seen = set()
+    for row in key_session_rows or []:
+        key = str(row["key_session_type"])
+        if key in seen:
+            continue
+        seen.add(key)
+        key_session_lines.append(
+            "- {label}：{activity}；{date}；{workout}；{distance} km；配速 {pace}；HR {hr}；負荷 {load}；鞋款 {shoe}".format(
+                label=session_label_map.get(key, key),
+                activity=str(row["activity_name"] or row["activity_type"] or "活動"),
+                date=format_short_datetime(row["activity_start_time"]),
+                workout=str(row["workout_type_name_en"] or "未標註"),
+                distance=format_number(row["distance_km"], 2) or "—",
+                pace=format_pace_seconds(row["avg_pace_sec_per_km"]) or "—",
+                hr="" if row["avg_hr"] is None else int(round(row["avg_hr"])),
+                load=format_number(row["training_load"], 1) or "—",
+                shoe=str(row["shoe_display_name"] or "未標註"),
+            )
+        )
+
+    prompt_lines = [
+        "請根據以下已治理的跑步資料，用繁體中文做進一步分析。",
+        "請先回答這個月目前位於什麼訓練位置，再說明原因，最後只留一個下個月提醒。",
+        "只能根據我提供的內容分析，不要自行發明額外訓練、健康或心理狀態。",
+        "",
+        "## Monthly Facts",
+        f"- 月份：{monthly['month_key']}",
+        f"- 狀態：{'進行中' if intelligence['is_partial_month'] else '完整'}",
+        f"- 里程：{format_number(monthly['total_km'], 1)} km",
+        f"- 負荷：{format_number(monthly['training_load'], 0) or '—'}",
+        f"- 活動數：{monthly['activities'] or 0}",
+        f"- 平均配速：{format_pace_seconds(monthly['avg_pace_sec_per_km']) or '—'}",
+        f"- 相對基準負荷：{format_delta_pct(intelligence['load_delta']) if intelligence['load_delta'] is not None else '基準建立中'}",
+        f"- 相對基準里程：{format_delta_pct(intelligence['km_delta']) if intelligence['km_delta'] is not None else '—'}",
+        f"- 品質課數：{quality_sessions}",
+        f"- 長跑數：{long_runs}",
+        "",
+        "## Coach Understanding",
+        f"- Position：{verdict}",
+        f"- Phase：{phase}",
+        f"- Opening：{letter['opening']}",
+        f"- Verdict Reason：{verdict_reason}",
+        f"- Coach Summary：{intelligence['coach_summary']}",
+        f"- Next：{letter['looking_forward']}",
+    ]
+
+    if coach_memory:
+        prompt_lines.extend([
+            f"- Previous Month：{coach_memory['previous_month_key']}",
+            f"- Previous Recommendation：{coach_memory['previous_recommendation']}",
+            f"- Follow-up：{coach_memory['follow_up']}",
+        ])
+
+    prompt_lines.extend([
+        "",
+        "## Reasoning",
+        *[f"- {point}" for point in why_points],
+    ])
+
+    if week_lines:
+        prompt_lines.extend([
+            "",
+            "## Attention Weeks",
+            *week_lines,
+        ])
+
+    if key_session_lines:
+        prompt_lines.extend([
+            "",
+            "## Attention Activities",
+            *key_session_lines,
+        ])
+
+    if include_raw_data and distribution_rows:
+        prompt_lines.extend([
+            "",
+            "## Evidence",
+            "### 本月訓練結構",
+            "| 課表 | 目的 | 活動數 | KM | 平均負荷 |",
+            "| --- | --- | --- | --- | --- |",
+        ])
+        for row in distribution_rows:
+            prompt_lines.append(
+                "| {workout} | {purpose} | {count} | {km} | {load} |".format(
+                    workout=str(row["workout_type_name_en"] or "未標註"),
+                    purpose=str(row["primary_training_purpose_name_en"] or "未標註"),
+                    count=row["activity_count"],
+                    km=format_number(row["total_km"], 2) or "—",
+                    load=format_number(row["avg_training_load"], 1) or "—",
+                )
+            )
+
+    prompt_lines.extend([
+        "",
+        "## Instructions",
+        "- 先講這個月目前位於什麼訓練位置。",
+        "- 再解釋平台為什麼會這樣判讀。",
+        "- 最後只留一個下個月提醒。",
+        "- 如果你從 attention weeks、attention activities 或本月訓練結構看見平台尚未明說、但值得注意的變化，可以補充提出。",
+        "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據 evidence 額外補充的觀察。",
+        "- 如果 evidence 與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
+    ])
+
+    return "\n".join(prompt_lines)
+
+
+def monthly_ai_handoff_panel(monthly, intelligence, progress_row, distribution_rows, key_session_rows, related_week_rows, coach_memory=None):
+    handoff_text = monthly_ai_handoff_text(
+        monthly,
+        intelligence,
+        progress_row,
+        distribution_rows,
+        key_session_rows,
+        related_week_rows,
+        coach_memory,
+        include_raw_data=True,
+    )
+    if not handoff_text:
+        return ""
+
+    return f"""
+      <section class="panel-section" id="monthly-ai-handoff">
+        <h2>交給 AI 繼續分析</h2>
+        <div class="review-card ai-handoff-card">
+          <span>AI Share Handoff</span>
+          <strong>把這個月的教練位置判讀直接交給你習慣的 AI</strong>
+          <p>如果你看完這個月後，想沿著平台已經整理好的位置、形成原因、關鍵週與關鍵課繼續往下聊，這裡就是完整交棒內容。</p>
+          <div class="ai-handoff-block">
+            <div class="ai-handoff-block-head">
+              <div>
+                <strong>完整 handoff</strong>
+                <p class="note">包含月判讀、形成原因、關鍵週、關鍵課與本月訓練結構。</p>
+              </div>
+              <div class="ai-handoff-actions">
+                <button class="secondary-action" type="button" onclick="copyAiHandoff('monthly-ai-handoff-text')">複製給 AI</button>
+              </div>
+            </div>
+            <details class="ai-handoff-preview">
+              <summary>先看會交出去的內容</summary>
+              <textarea id="monthly-ai-handoff-text" readonly>{html.escape(handoff_text)}</textarea>
+            </details>
+          </div>
+        </div>
+      </section>
+    """
+
+
 def monthly_key_sessions_table(rows):
     if not rows:
         return '<p class="note">本月還沒有代表課資料。</p>'
@@ -4858,6 +5060,7 @@ def monthly_review_panel(monthly, intelligence, progress_row, assignment_quality
         ("再看形成原因", "#monthly-understanding"),
         ("再看關鍵週", "#monthly-weeks"),
         ("最後回到關鍵課", "#monthly-key-activities"),
+        ("交給 AI 繼續分析", "#monthly-ai-handoff"),
     ]
 
     return f"""
@@ -4925,6 +5128,7 @@ def monthly_review_panel(monthly, intelligence, progress_row, assignment_quality
         <h2>教練看了哪些關鍵課</h2>
         {monthly_key_sessions_table(key_session_rows)}
       </section>
+      {monthly_ai_handoff_panel(monthly, intelligence, progress_row, distribution_rows, key_session_rows, related_week_rows, coach_memory)}
     """
 
 

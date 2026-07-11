@@ -499,7 +499,7 @@ def metadata_choice_sets(connection):
     return dropdown_options, shoes, workouts, purposes
 
 
-def metadata_candidates(connection, scope="unassigned", limit=40):
+def metadata_candidates(connection, scope="unassigned", limit=40, offset=0):
     clause = ""
     if scope == "unassigned":
         clause = """
@@ -543,8 +543,9 @@ def metadata_candidates(connection, scope="unassigned", limit=40):
         {clause}
         ORDER BY activity_start_time DESC
         LIMIT ?
+        OFFSET ?
         """,
-        (limit,),
+        (limit, offset),
     ).fetchall()
 
 
@@ -575,6 +576,21 @@ def metadata_scope_counts(connection):
         FROM activity_review_view
         """
     ).fetchone()
+
+
+def metadata_scope_total(scope_counts, scope):
+    if scope_counts is None:
+        return 0
+    mapping = {
+        "unassigned": "unassigned",
+        "missing_shoe": "missing_shoe",
+        "missing_workout": "missing_workout",
+        "missing_purpose": "missing_purpose",
+        "all": "total",
+        "complete": "complete",
+    }
+    key = mapping.get(scope, "unassigned")
+    return int(scope_counts[key] or 0)
 
 
 def metadata_activity(connection, activity_id):
@@ -4709,10 +4725,12 @@ def shoe_kpi_card(label, value, subtext=""):
     """
 
 
-def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, message=""):
+def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_counts=None, message=""):
     used_rows = [row for row in rows if (row["run_count"] or 0) > 0]
     active_rows = [row for row in rows if row["is_active"]]
     tagged_rows = [row for row in intelligence_rows if (row["tagged_activity_count"] or 0) > 0]
+    missing_shoe_count = int((scope_counts["missing_shoe"] or 0) if scope_counts else 0)
+    unassigned_count = int((scope_counts["unassigned"] or 0) if scope_counts else 0)
 
     most_used = max(used_rows, key=lambda row: (row["total_distance_km"] or 0, row["run_count"] or 0), default=None)
     fastest = min(
@@ -4930,6 +4948,17 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, message
         if not has_tracked_shoes
         else "新增目前在用的鞋款後，歷史活動就能開始補標，鞋款判讀也會一起變乾淨。"
     )
+    next_cleanup_text = (
+        f"目前還有 {missing_shoe_count} 筆歷史活動缺鞋款，補完後鞋款比較才會開始變乾淨。"
+        if missing_shoe_count > 0
+        else "鞋款資料已經補齊，接下來可以回頭整理課表與訓練目的，讓比較更乾淨。"
+    )
+    next_cleanup_href = (
+        "/?" + urlencode({"page": "metadata", "scope": "missing_shoe"})
+        if missing_shoe_count > 0
+        else "/?" + urlencode({"page": "metadata", "scope": "unassigned"})
+    )
+    next_cleanup_label = "去補歷史鞋款標註" if missing_shoe_count > 0 else "查看還有哪些標註沒補"
     empty_note_html = ""
     if not rows:
         empty_note_html = '<p class="note">目前還沒有鞋款資料，先從新增你現在在用的鞋開始。</p>'
@@ -4967,6 +4996,12 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, message
               <span>新增後會影響</span>
               <strong>Activity / Weekly / Monthly</strong>
               <p>鞋款補齊後，單堂課、週回顧與鞋款頁的判讀都會更完整。</p>
+            </div>
+            <div class="review-card">
+              <span>下一步</span>
+              <strong>{missing_shoe_count if missing_shoe_count > 0 else unassigned_count}</strong>
+              <p>{html.escape(next_cleanup_text)}</p>
+              <p><a href="{html.escape(next_cleanup_href, quote=True)}">{html.escape(next_cleanup_label)}</a></p>
             </div>
           </div>
         </div>
@@ -7052,6 +7087,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
     metadata_rows = []
     metadata_selected = None
     metadata_scope_data = None
+    shoes_scope_data = None
     recent = []
     activity_rows = []
     latest_activity = None
@@ -7114,6 +7150,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
             shoe_status_data = shoe_status_rows(connection)
             shoe_intelligence_rows = shoe_intelligence(connection)
             shoe_workout_rows = shoe_workout_comparison(connection, limit=12)
+            shoes_scope_data = metadata_scope_counts(connection)
 
         elif page == "training":
             distribution_rows = training_distribution(connection, limit=6)
@@ -7198,7 +7235,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
 
     if page == "shoes":
         return f"""{html_start}
-    {shoes_page_panel(shoe_rows, shoe_intelligence_rows, shoe_workout_rows, shoe_status_data, message)}
+    {shoes_page_panel(shoe_rows, shoe_intelligence_rows, shoe_workout_rows, shoe_status_data, shoes_scope_data, message)}
     {archive_metric_strip(summary)}
   </main>
 </body>

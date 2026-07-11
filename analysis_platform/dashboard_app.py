@@ -2194,6 +2194,28 @@ def rac_entry_panel():
     """
 
 
+def no_data_yet_panel():
+    return f"""
+      <section class="panel-section">
+        <h2>先開始第一批資料</h2>
+        <div class="coach-attention-card no-focus">
+          <span>第一次使用</span>
+          <strong>目前還沒有跑步資料</strong>
+          <p>這不是錯誤。先進入 RAC 匯入第一批 FIT，平台就會開始長出 Activity、Weekly、Monthly 與 Overview。</p>
+          <ul class="coach-attention-evidence">
+            <li>先選一個或幾個 FIT 檔</li>
+            <li>轉成 Excel 並寫回 SQLite</li>
+            <li>回到平台重新整理，就能開始看教練式回顧</li>
+          </ul>
+          <div class="coach-attention-footer">
+            <a class="desk-link" href="/open-rac">先進入 RAC</a>
+            <small>第一批資料匯入後，首頁會自動變成真正的 Overview。</small>
+          </div>
+        </div>
+      </section>
+    """
+
+
 def monthly_recommendation_plan(intelligence):
     if intelligence["is_partial_month"]:
         return (
@@ -6643,12 +6665,12 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
   <main>
     <section class="hero">
       <h1>Running Intelligence Platform</h1>
-      <p>從 SQLite 讀取治理後的跑步資料，整理成每天可使用的訓練回顧。</p>
+      <p>先匯入第一批跑步資料，平台才會開始整理出 Activity、Weekly、Monthly 與 Overview。</p>
     </section>
     {page_nav(page)}
-      <section class="status">
-      尚未找到 SQLite 資料庫：<code>{html.escape(str(DB_PATH))}</code>
-    </section>
+    {message and f'<section class="status">{html.escape(message)}</section>' or ""}
+    {no_data_yet_panel()}
+    {rac_entry_panel()}
   </main>
 </body>
 </html>"""

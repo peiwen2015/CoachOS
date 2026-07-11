@@ -363,10 +363,10 @@ def shoe_dimension_row(label):
     primary = label_primary(label) or str(label or "").strip()
     return {
         "shoe_code": code_from_label(primary, "shoe"),
-        "brand": None,
-        "model": primary or None,
+        "brand": "",
+        "model": primary or "",
         "nickname": None,
-        "category": None,
+        "category": "",
         "is_active": 1,
     }
 

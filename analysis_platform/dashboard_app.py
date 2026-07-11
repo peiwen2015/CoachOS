@@ -283,10 +283,10 @@ def shoe_dimension_row(label):
     primary = label_primary(label) or str(label or "").strip()
     return {
         "shoe_code": code_from_label(primary, "shoe"),
-        "brand": None,
-        "model": primary or None,
+        "brand": "",
+        "model": primary or "",
         "nickname": None,
-        "category": None,
+        "category": "",
         "is_active": 1,
     }
 
@@ -6977,6 +6977,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 message = f"已新增鞋款：{shoe_name}"
             except ValueError as exc:
                 message = str(exc)
+            except Exception:
+                message = "新增鞋款時出了點問題，請再試一次。"
             location = "/?" + urlencode(
                 {
                     "page": "shoes",

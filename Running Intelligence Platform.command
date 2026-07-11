@@ -6,6 +6,7 @@ cd "$(dirname "$0")"
 PYTHON_CMD="python3"
 APP_PYTHON="$PYTHON_CMD"
 DASHBOARD_PORT="8766"
+IMPORT_TOOL_PORT="8765"
 
 stop_server_on_port() {
   local port="$1"
@@ -54,6 +55,7 @@ then
   "$APP_PYTHON" -m pip install -r requirements.txt
 fi
 
+stop_server_on_port "$IMPORT_TOOL_PORT" "資料匯入工具"
 stop_server_on_port "$DASHBOARD_PORT" "Running Intelligence Platform"
 
 echo "啟動 Running Intelligence Platform..."

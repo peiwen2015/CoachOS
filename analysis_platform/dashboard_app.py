@@ -981,6 +981,7 @@ def weekly_review_payload(weekly, intelligence):
             ("先看學習", "#weekly-learning"),
             ("再看形成原因", "#weekly-cause"),
             ("再看關鍵課", "#weekly-key-activities"),
+            ("交給 AI 繼續分析", "#weekly-ai-handoff"),
         ],
     }
 
@@ -1143,6 +1144,7 @@ def activity_review_payload(activity, split_rows):
             ("再看形成原因", "#activity-cause"),
             ("再看關鍵片段", "#activity-segments"),
             ("最後回到證據", "#activity-evidence"),
+            ("交給 AI 繼續分析", "#activity-ai-handoff"),
         ],
     }
 
@@ -3778,9 +3780,9 @@ def weekly_distribution_snapshot(distribution_rows):
     }
 
 
-def weekly_learning_driver_card(intelligence, distribution_rows):
+def weekly_reasoning_rows(intelligence, distribution_rows):
     if not intelligence:
-        return ""
+        return []
 
     load_delta = intelligence["load_delta"]
     km_delta = intelligence["km_delta"]
@@ -3812,6 +3814,20 @@ def weekly_learning_driver_card(intelligence, distribution_rows):
     km_level, km_note = delta_level(km_delta, positive_threshold=10, negative_threshold=-10)
     stimulus_level_value, stimulus_note = stimulus_level(quality_sessions, long_run_sessions)
 
+    return [
+        {"label": "負荷節奏", "level": load_level, "note": load_note},
+        {"label": "跑量節奏", "level": km_level, "note": km_note},
+        {"label": "刺激安排", "level": stimulus_level_value, "note": stimulus_note},
+    ]
+
+
+def weekly_learning_driver_card(intelligence, distribution_rows):
+    if not intelligence:
+        return ""
+
+    load_delta = intelligence["load_delta"]
+    reasoning_rows = weekly_reasoning_rows(intelligence, distribution_rows)
+
     def driver_row(label, level, note):
         level_map = {
             "up": ("主要推力", "driver-up"),
@@ -3841,10 +3857,8 @@ def weekly_learning_driver_card(intelligence, distribution_rows):
       <div class="review-card driver-card briefing-chart-card">
         <span>先追問一件事</span>
         <strong>什麼真正讓你學會了這件事？</strong>
-        <div class="driver-list">
-          {driver_row("負荷節奏", load_level, load_note)}
-          {driver_row("跑量節奏", km_level, km_note)}
-          {driver_row("刺激安排", stimulus_level_value, stimulus_note)}
+          <div class="driver-list">
+          {"".join(driver_row(row["label"], row["level"], row["note"]) for row in reasoning_rows)}
         </div>
         <p>{html.escape(summary)}</p>
         <div class="reasoning-jump-row">
@@ -3909,6 +3923,160 @@ def weekly_structure_card(distribution_rows):
           <a class="inline-jump-link" href="#weekly-key-activities">再看是哪幾堂課留下來的</a>
         </div>
       </div>
+    """
+
+
+def weekly_ai_handoff_text(weekly, intelligence, review, distribution_rows, key_session_rows, history_rows, include_raw_data=False):
+    if not weekly or not intelligence or not review:
+        return ""
+
+    period_text = f"{weekly['start_date']} – {weekly['end_date']}"
+    total_km = f"{format_number(weekly['total_km'], 1)} km"
+    load_text = format_number(weekly["training_load"], 0) or "—"
+    activities_text = str(weekly["activities"] or 0)
+    avg_pace_text = format_pace_seconds(weekly["avg_pace_sec_per_km"]) or "—"
+    avg_hr_text = "" if weekly["avg_hr"] is None else str(int(round(weekly["avg_hr"])))
+
+    cause_lines = [
+        f"- {row['label']}：{row['note']}"
+        for row in weekly_reasoning_rows(intelligence, distribution_rows)
+    ]
+
+    key_session_lines = []
+    session_label_map = {
+        "Longest Run": "最長一課",
+        "Highest Load": "最高負荷",
+        "Fastest Quality": "最快品質課",
+        "Lowest HR Easy": "最低心率輕鬆跑",
+    }
+    seen = set()
+    for row in key_session_rows or []:
+        key = str(row["key_session_type"])
+        if key in seen:
+            continue
+        seen.add(key)
+        key_session_lines.append(
+            "- {label}：{activity}；{date}；{workout}；{distance} km；配速 {pace}；HR {hr}；負荷 {load}；鞋款 {shoe}".format(
+                label=session_label_map.get(key, key),
+                activity=str(row["activity_name"] or row["activity_type"] or "活動"),
+                date=format_short_datetime(row["activity_start_time"]),
+                workout=str(row["workout_type_name_en"] or "未標註"),
+                distance=format_number(row["distance_km"], 2) or "—",
+                pace=format_pace_seconds(row["avg_pace_sec_per_km"]) or "—",
+                hr="" if row["avg_hr"] is None else int(round(row["avg_hr"])),
+                load=format_number(row["training_load"], 1) or "—",
+                shoe=str(row["shoe_display_name"] or "未標註"),
+            )
+        )
+
+    prompt_lines = [
+        "請根據以下已治理的跑步資料，用繁體中文做進一步分析。",
+        "請先回答這週真正留下來的是什麼，再說明原因，最後只留一個下週提醒。",
+        "只能根據我提供的內容分析，不要自行發明額外訓練、健康或心理狀態。",
+        "",
+        "## Weekly Facts",
+        f"- 週期：{period_text}",
+        f"- 活動數：{activities_text}",
+        f"- 里程：{total_km}",
+        f"- 負荷：{load_text}",
+        f"- 平均配速：{avg_pace_text}",
+        f"- 平均心率：{avg_hr_text}",
+        f"- 相對基準負荷：{format_delta_pct(intelligence['load_delta']) if intelligence['load_delta'] is not None else '基準建立中'}",
+        f"- 相對基準里程：{format_delta_pct(intelligence['km_delta']) if intelligence['km_delta'] is not None else '—'}",
+        "",
+        "## Coach Understanding",
+        f"- 問題：{review['learning_question']}",
+        f"- Verdict：{review['verdict']}",
+        f"- Learning：{review['learning']}",
+        f"- Focus：{review['focus']}",
+        f"- Why：{review['why']}",
+        f"- Next：{review['looking_forward']}",
+        "",
+        "## Reasoning",
+        *cause_lines,
+    ]
+
+    if key_session_lines:
+        prompt_lines.extend([
+            "",
+            "## Attention Activities",
+            *key_session_lines,
+        ])
+
+    if include_raw_data and history_rows:
+        prompt_lines.extend([
+            "",
+            "## Evidence",
+            "### 最近 5 週節奏",
+            "| 週別 | 期間 | 活動數 | KM | 時間 | 配速 | 平均心率 | 負荷 |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        ])
+        for row in history_rows:
+            prompt_lines.append(
+                "| {week} | {period} | {activities} | {km} | {duration} | {pace} | {hr} | {load} |".format(
+                    week=week_label_from_offset(row["week_offset"]),
+                    period=f"{row['start_date']} – {row['end_date']}",
+                    activities=row["activities"],
+                    km=format_number(row["total_km"], 2) or "—",
+                    duration=format_hours(row["total_time_sec"]) or "—",
+                    pace=format_pace_seconds(row["avg_pace_sec_per_km"]) or "—",
+                    hr="" if row["avg_hr"] is None else row["avg_hr"],
+                    load="" if row["training_load"] is None else row["training_load"],
+                )
+            )
+
+    prompt_lines.extend([
+        "",
+        "## Instructions",
+        "- 先講這週真正留下來的是什麼。",
+        "- 再解釋為什麼平台會這樣判讀。",
+        "- 最後只留一個下週提醒。",
+        "- 如果你從最近 5 週節奏看見平台尚未明說、但值得注意的變化，可以補充提出。",
+        "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據 evidence 額外補充的觀察。",
+        "- 如果 evidence 與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
+    ])
+
+    return "\n".join(prompt_lines)
+
+
+def weekly_ai_handoff_panel(weekly, intelligence, review, distribution_rows, key_session_rows, history_rows):
+    handoff_text = weekly_ai_handoff_text(
+        weekly,
+        intelligence,
+        review,
+        distribution_rows,
+        key_session_rows,
+        history_rows,
+        include_raw_data=True,
+    )
+    if not handoff_text:
+        return ""
+
+    return f"""
+      <section class="panel-section" id="weekly-ai-handoff">
+        <h2>交給 AI 繼續分析</h2>
+        <div class="review-card ai-handoff-card">
+          <span>AI Share Handoff</span>
+          <strong>把這週的教練學習脈絡直接交給你習慣的 AI</strong>
+          <p>如果你看完這週後，想沿著平台已經整理好的學習、關鍵課與最近五週 evidence 繼續往下聊，這裡就是完整交棒內容。</p>
+          <div class="ai-handoff-block">
+            <div class="ai-handoff-block-head">
+              <div>
+                <strong>完整 handoff</strong>
+                <p class="note">包含這週判讀、形成原因、關鍵課與最近 5 週 evidence。</p>
+              </div>
+              <div class="ai-handoff-actions">
+                <button class="secondary-action" type="button" onclick="copyAiHandoff('weekly-ai-handoff')">複製給 AI</button>
+              </div>
+            </div>
+            <details class="ai-handoff-preview">
+              <summary>先看會交出去的內容</summary>
+              <textarea id="weekly-ai-handoff" readonly>{html.escape(handoff_text)}</textarea>
+            </details>
+          </div>
+          <p class="note" id="weekly-ai-handoff-status">先看完這週，再複製交給你習慣的 AI 繼續分析。</p>
+        </div>
+      </section>
     """
 
 
@@ -4246,60 +4414,36 @@ def activity_ai_handoff_panel(activity, review, split_rows, weekly_review=None, 
         split_rows,
         weekly_review,
         monthly_overview,
-        include_raw_data=False,
-    )
-    raw_handoff_text = activity_ai_handoff_text(
-        activity,
-        review,
-        split_rows,
-        weekly_review,
-        monthly_overview,
         include_raw_data=True,
     )
-    if not handoff_text or not raw_handoff_text:
+    if not handoff_text:
         return ""
 
     escaped_text = html.escape(handoff_text)
-    escaped_raw_text = html.escape(raw_handoff_text)
 
     return f"""
-      <section class="panel-section">
+      <section class="panel-section" id="activity-ai-handoff">
         <h2>交給 AI 繼續分析</h2>
         <div class="review-card ai-handoff-card">
           <span>AI Share Handoff</span>
           <strong>把這堂課的教練脈絡直接交給你習慣的 AI</strong>
-          <p>你可以先用精簡版交出教練脈絡；如果想讓 AI 有機會補充平台沒明說的觀察，再用含 raw data 的完整版。</p>
+          <p>如果你看完這堂課後，想沿著平台已經整理好的判讀、片段與 raw data 繼續往下聊，這裡就是完整交棒內容。</p>
           <div class="ai-handoff-block">
             <div class="ai-handoff-block-head">
               <div>
-                <strong>精簡版</strong>
-                <p class="note">先給教練判讀、形成原因、關鍵片段與上下文。</p>
+                <strong>完整 handoff</strong>
+                <p class="note">包含教練判讀、形成原因、關鍵片段、上下文與完整 split evidence。</p>
               </div>
               <div class="ai-handoff-actions">
-                <button class="secondary-action" type="button" onclick="copyAiHandoff('activity-ai-handoff')">複製精簡版</button>
+                <button class="secondary-action" type="button" onclick="copyAiHandoff('activity-ai-handoff')">複製給 AI</button>
               </div>
             </div>
             <details class="ai-handoff-preview">
-              <summary>先看精簡版內容</summary>
+              <summary>先看會交出去的內容</summary>
               <textarea id="activity-ai-handoff" readonly>{escaped_text}</textarea>
             </details>
           </div>
-          <div class="ai-handoff-block">
-            <div class="ai-handoff-block-head">
-              <div>
-                <strong>完整版（含 raw data）</strong>
-                <p class="note">在精簡版之上，再加完整每公里 split，讓 AI 可以補充額外觀察。</p>
-              </div>
-              <div class="ai-handoff-actions">
-                <button class="secondary-action" type="button" onclick="copyAiHandoff('activity-ai-handoff-raw')">複製完整版</button>
-              </div>
-            </div>
-            <details class="ai-handoff-preview">
-              <summary>先看完整版內容</summary>
-              <textarea id="activity-ai-handoff-raw" readonly>{escaped_raw_text}</textarea>
-            </details>
-          </div>
-          <p class="note" id="activity-ai-handoff-status">先複製，再貼到你習慣的 AI 裡繼續聊。</p>
+          <p class="note" id="activity-ai-handoff-status">先看完這堂課，再複製交給你習慣的 AI 繼續分析。</p>
         </div>
       </section>
     """
@@ -4343,7 +4487,6 @@ def activity_review_panel(activity, split_rows, activity_rows, selected_activity
 
     return f"""
       {activity_selector_bar(activity_rows, selected_activity_id)}
-      {activity_ai_handoff_panel(activity, review, split_rows, weekly_review, monthly_overview)}
       <section class="panel-section">
         <h2>單堂課教練回顧</h2>
         <div class="weekly-review-grid">
@@ -4406,6 +4549,7 @@ def activity_review_panel(activity, split_rows, activity_rows, selected_activity
         <p class="note">如果你想自己驗證教練剛剛為什麼這樣看，完整每公里資料放在這裡。</p>
         {activity_split_table(split_rows)}
       </section>
+      {activity_ai_handoff_panel(activity, review, split_rows, weekly_review, monthly_overview)}
     """
 
 
@@ -4873,6 +5017,7 @@ def weekly_review_panel(weekly, intelligence, history_rows, distribution_rows, k
         <h2>最近 5 週節奏</h2>
         {weekly_history_table(history_rows, selected_week)}
       </section>
+      {weekly_ai_handoff_panel(weekly, intelligence, review, distribution_rows, key_session_rows, history_rows)}
     """
 
 

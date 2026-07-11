@@ -172,6 +172,14 @@ docs/      架構與產品文件
 
 ---
 
+## License
+
+This project is released under the MIT License.
+
+See [`LICENSE`](/Users/perryliu/Documents/Running%20Analytics/LICENSE).
+
+---
+
 ## Prompt Reference
 
 [`跑步分析系統 Prompt v1.0.docx`](/Users/perryliu/Documents/Running%20Analytics/%E8%B7%91%E6%AD%A5%E5%88%86%E6%9E%90%E7%B3%BB%E7%B5%B1%20Prompt%20v1.0.docx) 是公開提供的 prompt reference。

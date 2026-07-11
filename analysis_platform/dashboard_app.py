@@ -214,6 +214,40 @@ def load_metadata_dropdown_options():
     return options
 
 
+def save_metadata_dropdown_options(options):
+    current = {}
+    if CONFIG_PATH.exists():
+        try:
+            current = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            current = {}
+
+    merged = dict(current)
+    merged.update(options)
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG_PATH.write_text(
+        json.dumps(merged, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def append_shoe_option(label):
+    value = str(label or "").strip()
+    if not value:
+        raise ValueError("請先輸入鞋款名稱。")
+
+    options = load_metadata_dropdown_options()
+    existing = {canonical_label(item).lower() for item in options.get("shoes", [])}
+    if canonical_label(value).lower() in existing:
+        raise ValueError("這雙鞋已經在清單裡了。")
+
+    updated_shoes = list(options.get("shoes", []))
+    updated_shoes.append(value)
+    options["shoes"] = updated_shoes
+    save_metadata_dropdown_options(options)
+    return value
+
+
 def label_primary(value):
     value = str(value or "").strip()
     if not value:
@@ -4585,9 +4619,49 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, message
         )
 
     message_html = f'<section class="status">{html.escape(message)}</section>' if message else ""
+    has_tracked_shoes = bool(status_rows)
+    add_shoe_help = (
+        "先把目前在用的鞋款加進來，之後補活動標註時就不用再回頭改設定檔。"
+        if not has_tracked_shoes
+        else "新增目前在用的鞋款後，歷史活動就能開始補標，鞋款判讀也會一起變乾淨。"
+    )
 
     return f"""
       {message_html}
+      <section class="panel-section">
+        <h2>先補鞋款</h2>
+        <div class="weekly-review-grid">
+          <div class="weekly-review-main">
+            <div class="review-header">
+              <div>
+                <span class="eyebrow">第一個有感的標註</span>
+                <strong>先把目前在用的鞋款加進來</strong>
+              </div>
+              <span class="status-badge balanced">{len(status_rows)} tracked</span>
+            </div>
+            <div class="coach-summary review-summary">
+              <span>為什麼先補鞋款</span>
+              <p>{html.escape(add_shoe_help)}</p>
+            </div>
+            <form method="post" action="/shoes/add" class="metadata-form">
+              <label>
+                <span>鞋款名稱</span>
+                <input type="text" name="shoe_name" placeholder="例如：Adidas Boston 13" required>
+              </label>
+              <div class="form-actions">
+                <button type="submit">新增鞋款</button>
+              </div>
+            </form>
+          </div>
+          <div class="weekly-review-side">
+            <div class="review-card">
+              <span>新增後會影響</span>
+              <strong>Activity / Weekly / Monthly</strong>
+              <p>鞋款補齊後，單堂課、週回顧與鞋款頁的判讀都會更完整。</p>
+            </div>
+          </div>
+        </div>
+      </section>
       <section class="panel-section">
         <h2>鞋款</h2>
         <div class="weekly-review-grid">
@@ -6896,6 +6970,24 @@ class DashboardHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         length = int(self.headers.get("Content-Length", "0"))
         form = parse_qs(self.rfile.read(length).decode("utf-8"))
+
+        if parsed.path == "/shoes/add":
+            try:
+                shoe_name = append_shoe_option(first_form_value(form, "shoe_name"))
+                with connect() as connection:
+                    ensure_metadata_dimensions(connection, load_metadata_dropdown_options())
+                    connection.commit()
+                message = f"已新增鞋款：{shoe_name}"
+            except ValueError as exc:
+                message = str(exc)
+            location = "/?" + urlencode(
+                {
+                    "page": "shoes",
+                    "message": message,
+                }
+            )
+            self.redirect(location)
+            return
 
         if parsed.path == "/shoes/save-status":
             shoe_id = int(first_form_value(form, "shoe_id", "0") or "0")

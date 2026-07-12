@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import io
 import argparse
 import hashlib
 import html
+import mimetypes
 import json
 import re
 import socket
@@ -284,6 +286,116 @@ def ai_reply_paths(surface, identifier):
     return folder / f"{stem}.json", folder / f"{stem}.md"
 
 
+def ai_reply_attachment_dir(surface, identifier):
+    return ai_reply_scope_dir(surface) / slugify_ai_reply_part(identifier) / "attachments"
+
+
+def ai_reply_attachment_url(surface, identifier, filename):
+    return "/ai-replies-file?" + urlencode(
+        {
+            "surface": surface,
+            "identifier": identifier,
+            "filename": filename,
+        }
+    )
+
+
+def sanitize_uploaded_filename(filename):
+    name = Path(str(filename or "").strip()).name
+    name = re.sub(r"[^A-Za-z0-9._-]+", "_", name)
+    name = re.sub(r"_+", "_", name).strip("._")
+    return name or "image"
+
+
+def list_ai_reply_attachments(surface, identifier):
+    folder = ai_reply_attachment_dir(surface, identifier)
+    if not folder.exists():
+        return []
+    items = []
+    for path in sorted(folder.iterdir()):
+        if not path.is_file():
+            continue
+        suffix = path.suffix.lower()
+        if suffix not in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}:
+            continue
+        stat = path.stat()
+        items.append(
+            {
+                "filename": path.name,
+                "url": ai_reply_attachment_url(surface, identifier, path.name),
+                "size": stat.st_size,
+                "updated_at": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+            }
+        )
+    return items
+
+
+def save_ai_reply_attachment(surface, identifier, uploaded_file):
+    original_name = getattr(uploaded_file, "filename", "") or "image"
+    file_data = uploaded_file.file.read() if getattr(uploaded_file, "file", None) else b""
+    if not file_data:
+        raise ValueError("上傳的圖檔是空的。")
+
+    folder = ai_reply_attachment_dir(surface, identifier)
+    folder.mkdir(parents=True, exist_ok=True)
+
+    stem = sanitize_uploaded_filename(Path(original_name).stem)
+    suffix = sanitize_uploaded_filename(Path(original_name).suffix).lower()
+    if suffix not in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}:
+        suffix = ".png"
+    digest = hashlib.sha1(file_data).hexdigest()[:10]
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    filename = f"{timestamp}_{digest}_{stem}{suffix}"
+    target = folder / filename
+    target.write_bytes(file_data)
+    return filename
+
+
+def delete_ai_reply_attachment(surface, identifier, filename):
+    target = ai_reply_attachment_dir(surface, identifier) / Path(str(filename or "")).name
+    resolved = target.resolve()
+    root = AI_REPLIES_DIR.resolve()
+    if not resolved.is_file() or not resolved.is_relative_to(root):
+        raise FileNotFoundError
+    resolved.unlink()
+    return resolved.name
+
+
+def render_ai_reply_attachments(surface, identifier, page="", activity_id="", week="", month=""):
+    attachments = list_ai_reply_attachments(surface, identifier)
+    if not attachments:
+        return '<p class="note">目前還沒有附加圖檔。</p>'
+
+    cards = []
+    for item in attachments:
+        hidden_fields = [
+            ("surface", surface),
+            ("identifier", identifier),
+            ("filename", item["filename"]),
+            ("page", page),
+            ("activity_id", activity_id),
+            ("week", week),
+            ("month", month),
+        ]
+        cards.append(
+            f"""
+            <figure class="ai-attachment-card">
+              <a href="{html.escape(item['url'], quote=True)}" target="_blank" rel="noreferrer">
+                <img src="{html.escape(item['url'], quote=True)}" alt="{html.escape(item['filename'])}">
+              </a>
+              <figcaption>
+                <span>{html.escape(item['updated_at'].replace('T', ' '))}</span>
+                <form method="post" action="/ai-replies/delete-image" class="ai-attachment-delete-form">
+                  {"".join(f'<input type="hidden" name="{html.escape(name, quote=True)}" value="{html.escape(value, quote=True)}">' for name, value in hidden_fields if value)}
+                  <button class="secondary-action ai-attachment-delete-button" type="submit">刪除這張</button>
+                </form>
+              </figcaption>
+            </figure>
+            """
+        )
+    return f'<div class="ai-attachment-gallery">{"".join(cards)}</div>'
+
+
 def normalize_ai_reply_record(record):
     if not isinstance(record, dict):
         return None
@@ -354,6 +466,63 @@ def save_ai_reply(surface, identifier, title, raw_text):
     record["markdownFile"] = markdown_path.name
     meta_path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return markdown
+
+
+class UploadedFormFile:
+    def __init__(self, filename, content, content_type="application/octet-stream"):
+        self.filename = filename
+        self.file = io.BytesIO(content)
+        self.content_type = content_type
+
+
+def parse_multipart_form_data(body, content_type):
+    if not content_type or "multipart/form-data" not in content_type:
+        return {}
+
+    boundary_match = re.search(r'boundary=("?)([^";]+)\1', content_type)
+    if not boundary_match:
+        return {}
+
+    boundary = boundary_match.group(2).encode("utf-8")
+    delimiter = b"--" + boundary
+    form = {}
+
+    for chunk in body.split(delimiter):
+        chunk = chunk.strip()
+        if not chunk or chunk == b"--":
+            continue
+        if chunk.endswith(b"--"):
+            chunk = chunk[:-2].strip()
+        header_blob, separator, data = chunk.partition(b"\r\n\r\n")
+        if not separator:
+            continue
+
+        headers = {}
+        for line in header_blob.split(b"\r\n"):
+            if b":" not in line:
+                continue
+            name, value = line.split(b":", 1)
+            headers[name.strip().lower()] = value.strip()
+
+        disposition = headers.get(b"content-disposition", b"").decode("utf-8", errors="replace")
+        field_match = re.search(r'name="([^"]+)"', disposition)
+        if not field_match:
+            continue
+        field_name = field_match.group(1)
+        filename_match = re.search(r'filename="([^"]*)"', disposition)
+        value = data.rstrip(b"\r\n")
+
+        if filename_match:
+            uploaded = UploadedFormFile(
+                filename_match.group(1),
+                value,
+                headers.get(b"content-type", b"application/octet-stream").decode("utf-8", errors="replace"),
+            )
+            form.setdefault(field_name, []).append(uploaded)
+        else:
+            form.setdefault(field_name, []).append(value.decode("utf-8", errors="replace"))
+
+    return form
 
 
 def ai_handoff_response_format_instructions():
@@ -2447,7 +2616,7 @@ def overview_attention_payload(connection):
     }
 
 
-def ai_reply_saved_panel(title, existing_reply=None):
+def ai_reply_saved_panel(title, existing_reply=None, return_page="", activity_id="", week="", month=""):
     if not existing_reply:
         return ""
     raw_markdown = existing_reply.get("responseMarkdown", "")
@@ -2463,6 +2632,10 @@ def ai_reply_saved_panel(title, existing_reply=None):
           <span>{html.escape(saved_note)}</span>
           <strong>{html.escape(title)}</strong>
           <div class="ai-reply-rendered">{rendered}</div>
+          <div class="ai-reply-attachments">
+            <strong>附加圖檔</strong>
+            {render_ai_reply_attachments(existing_reply.get("scope", ""), existing_reply.get("analysisNodeId", ""), return_page, activity_id, week, month)}
+          </div>
           <details class="ai-reply-raw">
             <summary>看原始 markdown</summary>
             <textarea readonly>{html.escape(raw_markdown)}</textarea>
@@ -2518,6 +2691,26 @@ def ai_reply_capture_panel(surface, identifier, title, return_page, existing_rep
               <button class="primary-action" type="submit">儲存 AI 回覆</button>
             </div>
           </form>
+          <form method="post" action="/ai-replies/upload-image" enctype="multipart/form-data" class="ai-reply-image-form">
+            <input type="hidden" name="surface" value="{html.escape(surface, quote=True)}">
+            <input type="hidden" name="identifier" value="{html.escape(identifier, quote=True)}">
+            <input type="hidden" name="title" value="{html.escape(title, quote=True)}">
+            <input type="hidden" name="page" value="{html.escape(return_page, quote=True)}">
+            <input type="hidden" name="activity_id" value="{html.escape(str(activity_id), quote=True)}">
+            <input type="hidden" name="week" value="{html.escape(str(week), quote=True)}">
+            <input type="hidden" name="month" value="{html.escape(str(month), quote=True)}">
+            <label class="inline-field">
+              <span>附加圖檔</span>
+              <input type="file" name="ai_reply_image" accept="image/*">
+            </label>
+            <div class="ai-handoff-actions">
+              <button class="secondary-action" type="submit">上傳圖檔</button>
+            </div>
+          </form>
+          <div class="ai-reply-attachments">
+            <strong>目前附加圖檔</strong>
+            {render_ai_reply_attachments(surface, identifier, return_page, activity_id, week, month)}
+          </div>
           <p class="note">{html.escape(saved_note)}</p>
         </div>
       </section>
@@ -2739,7 +2932,7 @@ def overview_ai_handoff_panel(attention, weekly_review, monthly_overview, latest
     if not handoff_text:
         return ""
 
-    saved_panel = ai_reply_saved_panel("今天的總覽 AI 回覆", saved_reply)
+    saved_panel = ai_reply_saved_panel("今天的總覽 AI 回覆", saved_reply, "home")
     capture_panel = ai_reply_capture_panel("overview", date.today().isoformat(), "今天的總覽 AI 回覆", "home", saved_reply)
 
     return f"""
@@ -4732,7 +4925,7 @@ def weekly_ai_handoff_panel(
         return ""
 
     title = f"{weekly['start_date']} – {weekly['end_date']} 週回顧 AI 回覆"
-    saved_panel = ai_reply_saved_panel(title, saved_reply)
+    saved_panel = ai_reply_saved_panel(title, saved_reply, "weekly", week=str(weekly["week_offset"]))
     capture_panel = ai_reply_capture_panel("weekly", f"{weekly['start_date']}:{weekly['end_date']}", title, "weekly", saved_reply, week=str(weekly['week_offset']))
 
     return f"""
@@ -5009,7 +5202,7 @@ def monthly_ai_handoff_panel(monthly, intelligence, progress_row, distribution_r
         return ""
 
     title = f'{monthly["month_key"]} 月回顧 AI 回覆'
-    saved_panel = ai_reply_saved_panel(title, saved_reply)
+    saved_panel = ai_reply_saved_panel(title, saved_reply, "monthly", month=str(monthly["month_key"]))
     capture_panel = ai_reply_capture_panel("monthly", str(monthly["month_key"]), title, "monthly", saved_reply, month=str(monthly["month_key"]))
 
     return f"""
@@ -5467,7 +5660,7 @@ def activity_ai_handoff_panel(activity, review, split_rows, weekly_review=None, 
 
     escaped_text = html.escape(handoff_text)
     title = f'{format_short_datetime(activity["activity_start_time"])} 單堂課 AI 回覆'
-    saved_panel = ai_reply_saved_panel(title, saved_reply)
+    saved_panel = ai_reply_saved_panel(title, saved_reply, "activity", activity_id=str(activity["activity_id"]))
     capture_panel = ai_reply_capture_panel("activity", str(activity["activity_id"]), title, "activity", saved_reply, activity_id=str(activity["activity_id"]))
 
     return f"""
@@ -8698,6 +8891,11 @@ def base_styles():
       display: grid;
       gap: 12px;
     }
+    .ai-reply-image-form {
+      display: grid;
+      gap: 12px;
+      padding-top: 4px;
+    }
     .ai-reply-form textarea,
     .ai-reply-raw textarea {
       width: 100%;
@@ -8709,6 +8907,13 @@ def base_styles():
       color: var(--ink);
       font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       resize: vertical;
+    }
+    .ai-reply-form input[type="file"],
+    .ai-reply-image-form input[type="file"] {
+      width: 100%;
+      padding: 10px 0;
+      border: 0;
+      background: transparent;
     }
     .ai-reply-preview {
       display: grid;
@@ -8739,6 +8944,61 @@ def base_styles():
       cursor: pointer;
       color: var(--ink);
       font-weight: 800;
+    }
+    .ai-reply-attachments {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .ai-reply-attachments > strong {
+      font-size: 14px;
+    }
+    .ai-attachment-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      justify-items: start;
+    }
+    .ai-attachment-card {
+      margin: 0;
+      display: grid;
+      gap: 8px;
+      justify-items: start;
+    }
+    .ai-attachment-card a {
+      display: grid;
+      place-items: center;
+      width: 100%;
+      justify-items: start;
+    }
+    .ai-attachment-card img {
+      display: block;
+      max-width: 100%;
+      max-height: 180px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #eef3f7;
+    }
+    .ai-attachment-card figcaption {
+      display: grid;
+      gap: 2px;
+      color: var(--muted);
+      font-size: 12px;
+      width: 100%;
+    }
+    .ai-attachment-delete-form {
+      margin: 0;
+    }
+    .ai-attachment-delete-button {
+      min-height: 32px;
+      padding: 0 10px;
+      font-size: 12px;
     }
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -9347,6 +9607,29 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if parsed.path.startswith("/assets/"):
             self.send_asset(ASSETS_DIR / parsed.path.removeprefix("/assets/"))
             return
+        if parsed.path == "/ai-replies-file":
+            query = parse_qs(parsed.query)
+            surface = (query.get("surface") or [""])[0]
+            identifier = (query.get("identifier") or [""])[0]
+            filename = (query.get("filename") or [""])[0]
+            target = ai_reply_attachment_dir(surface, identifier) / filename
+            try:
+                resolved = target.resolve()
+                root = AI_REPLIES_DIR.resolve()
+                if not resolved.is_file() or not resolved.is_relative_to(root):
+                    raise FileNotFoundError
+                data = resolved.read_bytes()
+            except (OSError, FileNotFoundError):
+                self.send_html(render_dashboard(message="找不到附加圖檔"), status=404)
+                return
+            content_type = mimetypes.guess_type(resolved.name)[0] or "application/octet-stream"
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(data)
+            return
         if parsed.path == "/open-rac":
             if ensure_rac_running():
                 self.redirect(f"http://{RAC_HOST}:{RAC_PORT}")
@@ -9379,9 +9662,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         length = int(self.headers.get("Content-Length", "0"))
-        form = parse_qs(self.rfile.read(length).decode("utf-8"))
+        body = self.rfile.read(length)
 
         if parsed.path == "/ai-replies/save":
+            form = parse_qs(body.decode("utf-8"))
             surface = first_form_value(form, "surface", "").strip()
             identifier = first_form_value(form, "identifier", "").strip()
             title = first_form_value(form, "title", "").strip() or "AI 回覆"
@@ -9407,7 +9691,74 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.redirect("/?" + urlencode(params))
             return
 
+        if parsed.path == "/ai-replies/upload-image":
+            form = parse_multipart_form_data(body, self.headers.get("Content-Type", ""))
+            surface = first_form_value(form, "surface", "").strip()
+            identifier = first_form_value(form, "identifier", "").strip()
+            title = first_form_value(form, "title", "").strip() or "AI 回覆"
+            page = first_form_value(form, "page", "home").strip() or "home"
+            activity_id = first_form_value(form, "activity_id", "").strip()
+            week = first_form_value(form, "week", "").strip()
+            month = first_form_value(form, "month", "").strip()
+            uploaded = form.get("ai_reply_image")
+            uploaded_file = None
+            if isinstance(uploaded, list) and uploaded:
+                uploaded_file = uploaded[0]
+
+            if not surface or not identifier or uploaded_file is None or not getattr(uploaded_file, "filename", ""):
+                message = "還沒選到圖檔，先挑一張圖片再上傳。"
+            else:
+                try:
+                    save_ai_reply_attachment(surface, identifier, uploaded_file)
+                    message = "圖檔已附加到這一頁"
+                except ValueError as exc:
+                    message = str(exc)
+                except Exception:
+                    message = "上傳圖檔時出了點問題，請再試一次。"
+
+            params = {"page": page, "message": message}
+            if activity_id:
+                params["activity"] = activity_id
+            if week:
+                params["week"] = week
+            if month:
+                params["month"] = month
+            self.redirect("/?" + urlencode(params))
+            return
+
+        if parsed.path == "/ai-replies/delete-image":
+            form = parse_qs(body.decode("utf-8"))
+            surface = first_form_value(form, "surface", "").strip()
+            identifier = first_form_value(form, "identifier", "").strip()
+            filename = first_form_value(form, "filename", "").strip()
+            page = first_form_value(form, "page", "home").strip() or "home"
+            activity_id = first_form_value(form, "activity_id", "").strip()
+            week = first_form_value(form, "week", "").strip()
+            month = first_form_value(form, "month", "").strip()
+
+            if not surface or not identifier or not filename:
+                message = "找不到要刪除的圖檔。"
+            else:
+                try:
+                    delete_ai_reply_attachment(surface, identifier, filename)
+                    message = "圖檔已刪除"
+                except FileNotFoundError:
+                    message = "找不到要刪除的圖檔。"
+                except Exception:
+                    message = "刪除圖檔時出了點問題，請再試一次。"
+
+            params = {"page": page, "message": message}
+            if activity_id:
+                params["activity"] = activity_id
+            if week:
+                params["week"] = week
+            if month:
+                params["month"] = month
+            self.redirect("/?" + urlencode(params))
+            return
+
         if parsed.path == "/shoes/add":
+            form = parse_qs(body.decode("utf-8"))
             try:
                 shoe_name = append_shoe_option(first_form_value(form, "shoe_name"))
                 with connect() as connection:
@@ -9428,6 +9779,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
 
         if parsed.path == "/shoes/save-status":
+            form = parse_qs(body.decode("utf-8"))
             shoe_id = int(first_form_value(form, "shoe_id", "0") or "0")
             is_active = 1 if first_form_value(form, "is_active", "1") == "1" else 0
             retire_date = first_form_value(form, "retire_date", "").strip() or None
@@ -9456,6 +9808,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
 
         if parsed.path == "/metadata/save":
+            form = parse_qs(body.decode("utf-8"))
             activity_id = int(first_form_value(form, "activity_id", "0") or "0")
             scope = first_form_value(form, "scope", "unassigned")
             batch = first_form_value(form, "batch", "1")
@@ -9488,6 +9841,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
 
         if parsed.path == "/metadata/batch":
+            form = parse_qs(body.decode("utf-8"))
             scope = first_form_value(form, "scope", "unassigned")
             batch = first_form_value(form, "batch", "1")
             activity_ids = [int(value) for value in form.get("activity_id", []) if str(value).isdigit()]

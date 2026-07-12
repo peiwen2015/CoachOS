@@ -137,6 +137,18 @@ def format_hours(seconds):
     return f"{hours}h {minutes:02d}m"
 
 
+def format_duration_hms(seconds):
+    if value_is_blank(seconds):
+        return ""
+    try:
+        total = int(round(float(seconds)))
+    except (TypeError, ValueError):
+        return ""
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}"
+
+
 def format_activity_time(value):
     if value_is_blank(value):
         return ""
@@ -987,15 +999,16 @@ def weekly_review_payload(weekly, intelligence):
 
 
 def activity_split_summary(split_rows):
-    if not split_rows:
+    analysis_rows = activity_analysis_splits(split_rows)
+    if not analysis_rows:
         return {
             "pace_change_sec": None,
             "hr_change": None,
             "first_pace": None,
             "last_pace": None,
         }
-    first = split_rows[0]
-    last = split_rows[-1]
+    first = analysis_rows[0]
+    last = analysis_rows[-1]
     first_pace = first["elapsed_pace_sec_per_km"]
     last_pace = last["elapsed_pace_sec_per_km"]
     first_hr = first["avg_hr"]
@@ -1012,6 +1025,40 @@ def activity_split_summary(split_rows):
         "first_pace": first_pace,
         "last_pace": last_pace,
     }
+
+
+def is_residual_split(row, min_distance_m=200):
+    distance_m = row["split_distance_m"] or 0
+    return float(distance_m) < float(min_distance_m)
+
+
+def activity_analysis_splits(split_rows):
+    if not split_rows:
+        return []
+    full_rows = [row for row in split_rows if not is_residual_split(row)]
+    return full_rows or split_rows
+
+
+def activity_split_label(row):
+    if is_residual_split(row):
+        distance_m = format_number(row["split_distance_m"], 0) or "0"
+        return f"尾端殘段（{distance_m} m）"
+    return f"KM {row['split_index']}"
+
+
+def split_total_time_sec(split_rows):
+    total = 0.0
+    has_value = False
+    for row in split_rows or []:
+        if row["elapsed_time_sec"] is not None:
+            total += float(row["elapsed_time_sec"])
+            has_value = True
+    return total if has_value else None
+
+
+def split_activity_max_hr(split_rows):
+    values = [float(row["max_hr"]) for row in (split_rows or []) if row["max_hr"] is not None]
+    return max(values) if values else None
 
 
 def activity_review_payload(activity, split_rows):
@@ -1068,11 +1115,12 @@ def activity_review_payload(activity, split_rows):
     else:
         why = "這堂課真正重要的，不是數字漂不漂亮，而是它有沒有替整體節奏留下東西。"
 
-    last_split_index = split_rows[-1]["split_index"] if split_rows else None
-    middle_split_index = split_rows[len(split_rows) // 2]["split_index"] if len(split_rows) >= 3 else last_split_index
+    analysis_rows = activity_analysis_splits(split_rows)
+    last_split_index = analysis_rows[-1]["split_index"] if analysis_rows else None
+    middle_split_index = analysis_rows[len(analysis_rows) // 2]["split_index"] if len(analysis_rows) >= 3 else last_split_index
 
     cards = []
-    if split_rows:
+    if analysis_rows:
         if pace_change is not None:
             pace_label = "後段仍穩" if pace_change <= 8 else "後段回落"
             pace_note = (
@@ -1116,9 +1164,16 @@ def activity_review_payload(activity, split_rows):
         if stamina_drop is not None:
             body_parts.append(f"Stamina -{format_number(stamina_drop, 0)}")
         if hr_change is not None:
-            body_parts.append(f"HR {format_number(hr_change, 0)} bpm")
+            if hr_change >= 0:
+                body_parts.append(f"首末完整公里 HR +{format_number(hr_change, 0)} bpm")
+            else:
+                body_parts.append(f"首末完整公里 HR {format_number(hr_change, 0)} bpm")
         body_label = " · ".join(body_parts) if body_parts else "身體有回應"
-        body_note = "環境與身體回應一起決定了今天該怎麼理解，不只是看配速。"
+        body_note = (
+            "環境與身體回應一起決定了今天該怎麼理解，不只是看單一配速。"
+            if is_hot else
+            "課程脈絡與身體回應一起決定了今天該怎麼理解，不只是看單一配速。"
+        )
         cards.append({
             "title": "身體訊號",
             "value": body_label,
@@ -4514,25 +4569,26 @@ def monthly_key_sessions_table(rows):
 
 
 def activity_key_segments(split_rows):
-    if not split_rows:
+    analysis_rows = activity_analysis_splits(split_rows)
+    if not analysis_rows:
         return []
     rows = []
-    first = split_rows[0]
-    last = split_rows[-1]
+    first = analysis_rows[0]
+    last = analysis_rows[-1]
     rows.append({
         "anchor": "fragment-start",
         "label": "起跑節奏",
-        "section": f"KM {first['split_index']}",
+        "section": activity_split_label(first),
         "metric": f"配速 {format_pace_seconds(first['elapsed_pace_sec_per_km']) or '—'} · HR {'' if first['avg_hr'] is None else int(round(first['avg_hr']))}",
         "note": "先看這堂課一開始是怎麼進入今天的節奏。",
         "split_anchor": f"split-{first['split_index']}",
     })
-    if len(split_rows) >= 3:
-        middle = split_rows[len(split_rows) // 2]
+    if len(analysis_rows) >= 3:
+        middle = analysis_rows[len(analysis_rows) // 2]
         rows.append({
             "anchor": "fragment-middle",
             "label": "中段反應",
-            "section": f"KM {middle['split_index']}",
+            "section": activity_split_label(middle),
             "metric": f"配速 {format_pace_seconds(middle['elapsed_pace_sec_per_km']) or '—'} · HR {'' if middle['avg_hr'] is None else int(round(middle['avg_hr']))}",
             "note": "中段通常最能看出刺激有沒有真正成立。",
             "split_anchor": f"split-{middle['split_index']}",
@@ -4540,7 +4596,7 @@ def activity_key_segments(split_rows):
     rows.append({
         "anchor": "fragment-finish",
         "label": "收尾狀態",
-        "section": f"KM {last['split_index']}",
+        "section": activity_split_label(last),
         "metric": f"配速 {format_pace_seconds(last['elapsed_pace_sec_per_km']) or '—'} · HR {'' if last['avg_hr'] is None else int(round(last['avg_hr']))}",
         "note": "最後一段最能看出今天留下來的是節奏、耐力，還是單純把課表做完。",
         "split_anchor": f"split-{last['split_index']}",
@@ -4618,6 +4674,8 @@ def activity_facts_panel(activity):
     ]
     if activity["primary_training_purpose_name_en"]:
         chips.append(detail_chip("主要目的", activity["primary_training_purpose_name_en"]))
+    if activity["secondary_training_purpose_names_en"]:
+        chips.append(detail_chip("次要目的", activity["secondary_training_purpose_names_en"]))
     if activity["temperature_c"] is not None:
         chips.append(detail_chip("氣溫", f"{format_number(activity['temperature_c'], 0)}°C"))
     if activity["humidity_pct"] is not None:
@@ -4648,11 +4706,17 @@ def activity_split_table(split_rows):
     body = []
     for row in split_rows:
         cadence = "" if row["avg_cadence_spm"] is None else format_number(row["avg_cadence_spm"], 1)
+        label = activity_split_label(row)
+        distance_text = (
+            f"{format_number((row['split_distance_m'] or 0) / 1000, 2)} km"
+            if not is_residual_split(row)
+            else f"{format_number(row['split_distance_m'], 0)} m"
+        )
         body.append(
             f"""
             <tr id="split-{row["split_index"]}">
-              <td>{row["split_index"]}</td>
-              <td>{format_number((row["split_distance_m"] or 0) / 1000, 2)}</td>
+              <td>{html.escape(label)}</td>
+              <td>{html.escape(distance_text)}</td>
               <td>{html.escape(format_pace_seconds(row["elapsed_pace_sec_per_km"]))}</td>
               <td>{'' if row["avg_hr"] is None else int(round(row["avg_hr"]))}</td>
               <td>{'' if row["avg_power_w"] is None else int(round(row["avg_power_w"]))}</td>
@@ -4665,7 +4729,7 @@ def activity_split_table(split_rows):
         <table>
           <thead>
             <tr>
-              <th>KM</th>
+              <th>片段</th>
               <th>距離</th>
               <th>配速</th>
               <th>HR</th>
@@ -4694,10 +4758,14 @@ def activity_ai_handoff_text(activity, review, split_rows, weekly_review=None, m
     wind_speed_text = format_number(activity["wind_speed_mps"], 1) if activity["wind_speed_mps"] is not None else None
     wind_direction_text = format_number(activity["wind_direction_deg"], 0) if activity["wind_direction_deg"] is not None else None
     cadence_text = format_number(activity["avg_cadence_spm"], 1) if activity["avg_cadence_spm"] is not None else None
-    stride_text = format_number(activity["avg_stride_length_mm"], 0) if activity["avg_stride_length_mm"] is not None else None
-    gct_text = format_number(activity["avg_gct_ms"], 0) if activity["avg_gct_ms"] is not None else None
+    stride_text = format_number(activity["avg_stride_length_mm"], 1) if activity["avg_stride_length_mm"] is not None else None
+    gct_text = format_number(activity["avg_gct_ms"], 1) if activity["avg_gct_ms"] is not None else None
     vosc_text = format_number(activity["avg_vertical_oscillation_mm"], 1) if activity["avg_vertical_oscillation_mm"] is not None else None
     vratio_text = format_number(activity["avg_vertical_ratio_pct"], 1) if activity["avg_vertical_ratio_pct"] is not None else None
+    recorded_duration_text = format_duration_hms(activity["duration_sec"])
+    split_total_text = format_duration_hms(split_total_time_sec(split_rows))
+    athlete_max_hr_text = raw_text(activity["max_hr"])
+    activity_max_hr_text = raw_text("" if split_activity_max_hr(split_rows) is None else int(round(split_activity_max_hr(split_rows))))
 
     activity_name = str(activity["activity_name"] or activity["activity_type"] or "活動")
     workout_name = str(activity["workout_type_name_en"] or activity["activity_type"] or "活動")
@@ -4708,6 +4776,7 @@ def activity_ai_handoff_text(activity, review, split_rows, weekly_review=None, m
     hr_text = "" if activity["avg_hr"] is None else str(int(round(activity["avg_hr"])))
     shoe_text = str(activity["shoe_display_name"] or "未標註")
     purpose_text = str(activity["primary_training_purpose_name_en"] or "未標註")
+    secondary_purpose_text = str(activity["secondary_training_purpose_names_en"] or "").strip()
 
     cause_lines = []
     for card in review.get("cards", []):
@@ -4740,6 +4809,11 @@ def activity_ai_handoff_text(activity, review, split_rows, weekly_review=None, m
         f"- 平均心率：{hr_text}",
         f"- 鞋款：{shoe_text}",
         f"- 主要目的：{purpose_text}",
+    ]
+    if secondary_purpose_text:
+        prompt_lines.append(f"- 次要目的：{secondary_purpose_text}")
+
+    prompt_lines.extend([
         "",
         "## Coach Understanding",
         f"- 問題：{review['learning_question']}",
@@ -4750,7 +4824,7 @@ def activity_ai_handoff_text(activity, review, split_rows, weekly_review=None, m
         "",
         "## Reasoning",
         *cause_lines,
-    ]
+    ])
 
     if segment_lines:
         prompt_lines.extend([
@@ -4775,13 +4849,15 @@ def activity_ai_handoff_text(activity, review, split_rows, weekly_review=None, m
             f"- Source File：{raw_text(activity['source_file_name'])}",
             f"- Data Source：{raw_text(activity['data_source'])}",
             f"- Excel Schema Version：{raw_text(activity['excel_schema_version'])}",
-            f"- Duration：{format_hours(activity['duration_sec']) or '—'}",
+            f"- Recorded Duration：{raw_text(recorded_duration_text)}",
+            f"- Split Total Time：{raw_text(split_total_text)}",
             f"- Temperature：{raw_text(temperature_text)}",
             f"- Humidity：{raw_text(humidity_text)}",
             f"- Wind Speed：{raw_text(wind_speed_text)}",
             f"- Wind Direction：{raw_text(wind_direction_text)}",
             f"- Weather：{raw_text(activity['weather_description'])}",
-            f"- Max HR：{raw_text(activity['max_hr'])}",
+            f"- Athlete Max HR Setting：{athlete_max_hr_text}",
+            f"- Activity Max HR：{activity_max_hr_text}",
             f"- Critical Power：{raw_text(activity['critical_power_w'])}",
             f"- Training Effect Aerobic：{raw_text(activity['training_effect_aerobic'])}",
             f"- Training Effect Anaerobic：{raw_text(activity['training_effect_anaerobic'])}",
@@ -4795,29 +4871,35 @@ def activity_ai_handoff_text(activity, review, split_rows, weekly_review=None, m
             f"- Avg Vertical Ratio：{raw_text(vratio_text)}",
             f"- Garmin Feeling：{raw_text(activity['garmin_feeling'])}",
             f"- Garmin RPE：{raw_text(activity['garmin_perceived_effort'])}",
+            f"- Secondary Training Purpose：{raw_text(secondary_purpose_text)}",
             f"- Nutrition：{raw_text(activity['nutrition'])}",
             f"- Notes：{raw_text(activity['notes'])}",
             "",
             "### 完整每公里 split 原始資料",
-            "| KM | 距離 | 配速 | Avg HR | Max HR | 功率 | 步頻 | 步幅 | GCT | 垂直比 | 垂直振幅 | 爬升 | 下降 | Stamina Start | Stamina End |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+            "| 片段 | 距離 | 時間 | 配速 | Avg HR | Max HR | 功率 | 步頻 | 步幅 | GCT | 垂直比 | 垂直振幅 | 爬升 | 下降 | Stamina Start | Stamina End |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         ])
         for row in split_rows:
             prompt_lines.append(
-                "| {km} | {distance} | {pace} | {hr} | {max_hr} | {power} | {cadence} | {stride} | {gct} | {vratio} | {vosc} | {gain} | {loss} | {stamina_start} | {stamina_end} |".format(
-                    km=row["split_index"],
-                    distance=format_number((row["split_distance_m"] or 0) / 1000, 2) or "—",
+                "| {label} | {distance} | {elapsed} | {pace} | {hr} | {max_hr} | {power} | {cadence} | {stride} | {gct} | {vratio} | {vosc} | {gain} | {loss} | {stamina_start} | {stamina_end} |".format(
+                    label=activity_split_label(row),
+                    distance=(
+                        f"{format_number((row['split_distance_m'] or 0) / 1000, 3)} km"
+                        if not is_residual_split(row)
+                        else f"{format_number(row['split_distance_m'], 0)} m"
+                    ),
+                    elapsed=raw_text(format_duration_hms(row["elapsed_time_sec"])),
                     pace=format_pace_seconds(row["elapsed_pace_sec_per_km"]) or "—",
                     hr="" if row["avg_hr"] is None else int(round(row["avg_hr"])),
                     max_hr="" if row["max_hr"] is None else int(round(row["max_hr"])),
                     power="" if row["avg_power_w"] is None else int(round(row["avg_power_w"])),
                     cadence="" if row["avg_cadence_spm"] is None else format_number(row["avg_cadence_spm"], 1),
-                    stride="" if row["avg_stride_length_mm"] is None else format_number(row["avg_stride_length_mm"], 0),
-                    gct="" if row["avg_gct_ms"] is None else format_number(row["avg_gct_ms"], 0),
+                    stride="" if row["avg_stride_length_mm"] is None else format_number(row["avg_stride_length_mm"], 1),
+                    gct="" if row["avg_gct_ms"] is None else format_number(row["avg_gct_ms"], 1),
                     vratio="" if row["avg_vertical_ratio_pct"] is None else format_number(row["avg_vertical_ratio_pct"], 1),
                     vosc="" if row["avg_vertical_oscillation_mm"] is None else format_number(row["avg_vertical_oscillation_mm"], 1),
-                    gain="" if row["elevation_gain_m"] is None else format_number(row["elevation_gain_m"], 1),
-                    loss="" if row["elevation_loss_m"] is None else format_number(row["elevation_loss_m"], 1),
+                    gain="0" if row["elevation_gain_m"] in (None, "") else format_number(row["elevation_gain_m"], 1),
+                    loss="0" if row["elevation_loss_m"] in (None, "") else format_number(row["elevation_loss_m"], 1),
                     stamina_start="" if row["stamina_start_pct"] is None else row["stamina_start_pct"],
                     stamina_end="" if row["stamina_end_pct"] is None else row["stamina_end_pct"],
                 )

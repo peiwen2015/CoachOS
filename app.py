@@ -1226,25 +1226,25 @@ def workout_focus_reference_table(dropdown_options):
     """
 
 
-def product_banner(title="FIT 匯入與資料整理"):
+def product_banner(title="CoachOS Import Studio"):
     return f"""
       <section class="product-banner">
         <div class="banner-copy">
           <div class="brand-row">
-            <img class="brand-mark" src="/assets/rac_mark_transparent.png" alt="資料匯入工具">
+            <img class="brand-mark" src="/assets/coachos_logo_transparent.png" alt="CoachOS Import Studio">
             <div>
               <h1>{html.escape(title)}</h1>
-              <p class="brand-subtitle">FIT IMPORT & DATA PREP</p>
+              <p class="brand-subtitle">COACHOS · FIT IMPORT & DATA PREP</p>
             </div>
           </div>
-          <p class="banner-subtitle">Garmin FIT -> Standardized Excel -> AI Coach Analysis</p>
+          <p class="banner-subtitle">Garmin FIT → Standardized Excel → CoachOS Analysis</p>
           <div class="flow">
             <span>FIT Import</span>
             <span>{html.escape(EXCEL_SCHEMA_LABEL)}</span>
-            <span>AI Coach</span>
+            <span>CoachOS</span>
             <span>Long-term Analytics</span>
           </div>
-          <p class="banner-note">將 Garmin FIT 活動檔轉換為固定格式 Excel，支援每日 AI 教練分析、週/月趨勢與長期跑步資料庫。</p>
+          <p class="banner-note">將 Garmin FIT 活動檔轉換為固定格式 Excel，支援每日 CoachOS 判讀、週/月趨勢與長期跑步資料庫。</p>
         </div>
       </section>
     """
@@ -1278,29 +1278,36 @@ def base_styles():
     return """
     :root {
       color-scheme: light;
-      --ink: #18222f;
-      --muted: #657386;
-      --line: #d9e3ee;
-      --accent: #0f766e;
-      --accent-dark: #0b4f5f;
-      --accent-soft: #e7f4f2;
-      --surface: #ffffff;
-      --page: #f3f7fa;
+      --ink: #16243a;
+      --muted: #5f7088;
+      --line: rgba(22, 36, 58, 0.10);
+      --accent: #3cc9c7;
+      --accent-dark: #143255;
+      --accent-soft: #e8fbf7;
+      --surface: rgba(255, 255, 255, 0.84);
+      --page: #f5f8fc;
+      --shadow: 0 20px 44px rgba(18, 35, 58, 0.08);
       --error: #b42318;
       --ok: #166534;
     }
     * { box-sizing: border-box; }
+    html {
+      scroll-behavior: smooth;
+    }
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
       background:
-        linear-gradient(180deg, #edf5f7 0, var(--page) 260px),
+        radial-gradient(circle at 20% 0%, rgba(60, 201, 199, 0.16), transparent 34%),
+        radial-gradient(circle at 82% 12%, rgba(20, 50, 85, 0.12), transparent 30%),
+        linear-gradient(180deg, #eef5fb 0, var(--page) 250px),
         var(--page);
       color: var(--ink);
+      min-height: 100vh;
     }
     main {
-      width: min(1120px, calc(100vw - 32px));
-      margin: 28px auto 40px;
+      width: min(1180px, calc(100vw - 32px));
+      margin: 26px auto 44px;
     }
     h1 {
       margin: 0 0 6px;
@@ -1313,14 +1320,26 @@ def base_styles():
       gap: 24px;
       align-items: start;
       margin: 0 0 18px;
-      padding: 28px 32px;
-      border-radius: 18px;
+      padding: 30px 32px;
+      border-radius: 26px;
       color: #fff;
       background:
-        linear-gradient(90deg, rgba(3, 33, 48, 0.7) 0%, rgba(5, 55, 65, 0.38) 46%, rgba(5, 87, 88, 0.2) 100%),
+        linear-gradient(110deg, rgba(9, 24, 44, 0.92) 0%, rgba(14, 37, 67, 0.82) 48%, rgba(22, 137, 141, 0.64) 100%),
         url("/assets/rac_banner.png") center / cover no-repeat;
-      box-shadow: 0 18px 48px rgba(11, 79, 95, 0.22);
+      box-shadow: var(--shadow);
       min-height: 286px;
+      position: relative;
+      overflow: hidden;
+    }
+    .product-banner::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 38%),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05), transparent 52%);
+      mix-blend-mode: screen;
+      pointer-events: none;
     }
     .eyebrow {
       margin: 0 0 8px;
@@ -1344,14 +1363,15 @@ def base_styles():
     .brand-mark {
       width: min(320px, 32vw);
       height: auto;
-      filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.28));
+      filter: drop-shadow(0 16px 28px rgba(0, 0, 0, 0.34));
     }
     .brand-subtitle {
       margin: 8px 0 0;
-      color: rgba(220, 236, 242, 0.76);
-      font-size: 20px;
+      color: rgba(220, 243, 244, 0.84);
+      font-size: 18px;
       font-weight: 800;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
     }
     .banner-subtitle {
       margin: 18px 0 0;
@@ -1386,8 +1406,8 @@ def base_styles():
       font-weight: 700;
     }
     .flow span + span::before {
-      content: "-> ";
-      opacity: 0.68;
+      content: "→ ";
+      opacity: 0.78;
     }
     nav {
       display: flex;
@@ -1395,10 +1415,11 @@ def base_styles():
       gap: 4px;
       margin: 0 0 18px;
       padding: 4px;
-      border: 1px solid var(--line);
+      border: 1px solid rgba(22, 36, 58, 0.08);
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.74);
-      box-shadow: 0 8px 24px rgba(31, 41, 51, 0.06);
+      background: rgba(255, 255, 255, 0.80);
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
     }
     .nav-link {
       color: var(--muted);
@@ -1409,18 +1430,18 @@ def base_styles():
     }
     .nav-link.active {
       color: #fff;
-      background: var(--accent-dark);
+      background: linear-gradient(135deg, var(--accent-dark), #11a89f);
     }
     .nav-link-secondary {
       color: var(--accent-dark);
-      background: rgba(15, 118, 110, 0.08);
+      background: rgba(60, 201, 199, 0.10);
     }
     form {
       background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 12px;
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      border-radius: 18px;
       padding: 24px;
-      box-shadow: 0 16px 42px rgba(31, 41, 51, 0.1);
+      box-shadow: var(--shadow);
     }
     fieldset {
       border: 0;
@@ -1452,14 +1473,14 @@ def base_styles():
     input, select, textarea {
       width: 100%;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 16px;
       padding: 10px 11px;
       font: inherit;
       color: var(--ink);
       background: #fff;
     }
     input:focus, select:focus, textarea:focus {
-      outline: 3px solid rgba(15, 118, 110, 0.16);
+      outline: 3px solid rgba(60, 201, 199, 0.18);
       border-color: var(--accent);
     }
     select[multiple] {
@@ -1494,8 +1515,8 @@ def base_styles():
     button, .button {
       appearance: none;
       border: 0;
-      border-radius: 8px;
-      background: var(--accent-dark);
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--accent-dark), #11a89f);
       color: #fff;
       padding: 11px 16px;
       font: inherit;
@@ -1508,19 +1529,20 @@ def base_styles():
       background: var(--accent);
     }
     .secondary {
-      background: #e7f0f3;
+      background: rgba(60, 201, 199, 0.10);
       color: var(--ink);
     }
     .secondary:hover {
-      background: #d7e3ee;
+      background: rgba(60, 201, 199, 0.16);
     }
     .status {
-      border-radius: 8px;
+      border-radius: 18px;
       padding: 14px 16px;
       margin: 0 0 18px;
-      border: 1px solid var(--line);
-      background: #fff;
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      background: var(--surface);
       line-height: 1.55;
+      box-shadow: var(--shadow);
     }
     .ok { color: var(--ok); }
     .error { color: var(--error); }
@@ -1549,24 +1571,24 @@ def base_styles():
     }
     .progress-card {
       background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 12px;
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      border-radius: 18px;
       padding: 24px;
-      box-shadow: 0 16px 42px rgba(31, 41, 51, 0.1);
+      box-shadow: var(--shadow);
     }
     .progress-bar {
       width: 100%;
       height: 14px;
       overflow: hidden;
       border-radius: 999px;
-      background: #dbe7ee;
+      background: rgba(22, 36, 58, 0.08);
       margin: 14px 0 10px;
     }
     .progress-fill {
       width: 0%;
       height: 100%;
       border-radius: inherit;
-      background: var(--accent-dark);
+      background: linear-gradient(90deg, var(--accent-dark) 0%, #11a89f 100%);
       transition: width 0.25s ease;
     }
     .progress-meta {
@@ -1603,10 +1625,10 @@ def base_styles():
     }
     .reference-table-wrap {
       overflow-x: auto;
-      border: 1px solid var(--line);
-      border-radius: 12px;
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      border-radius: 18px;
       background: #fff;
-      box-shadow: 0 8px 22px rgba(31, 41, 51, 0.06);
+      box-shadow: var(--shadow);
     }
     .reference-table {
       width: 100%;
@@ -1622,7 +1644,7 @@ def base_styles():
       vertical-align: middle;
     }
     .reference-table th {
-      background: #f7fafb;
+      background: rgba(245, 248, 252, 0.96);
       font-weight: 800;
     }
     .reference-table tr:last-child td {
@@ -1685,7 +1707,7 @@ def render_page(message="", error="", selected_fit=""):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>FIT 匯入與資料整理</title>
+  <title>CoachOS Import Studio</title>
   <style>
     {base_styles()}
   </style>
@@ -1831,7 +1853,7 @@ def render_download_fit_page(message="", error=""):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>下載 Garmin FIT</title>
+  <title>CoachOS - 下載 Garmin FIT</title>
   <style>
     {base_styles()}
   </style>
@@ -1989,7 +2011,7 @@ def render_batch_convert_page(message="", error="", selected_month=""):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>批次轉檔</title>
+  <title>CoachOS - 批次轉檔</title>
   <style>
     {base_styles()}
   </style>
@@ -2053,7 +2075,7 @@ def render_batch_progress_page(job_id):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>批次轉檔進度</title>
+  <title>CoachOS - 批次轉檔進度</title>
   <style>
     {base_styles()}
   </style>
@@ -2132,7 +2154,7 @@ def render_edit_excel_page(path, message="", error="", job_id=""):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>補活動資訊</title>
+  <title>CoachOS - 補活動資訊</title>
   <style>
     {base_styles()}
   </style>
@@ -2273,7 +2295,7 @@ def render_options_page(message="", error=""):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>下拉選單設定</title>
+  <title>CoachOS - 下拉選單設定</title>
   <style>
     {base_styles()}
   </style>
@@ -2586,7 +2608,7 @@ def main():
             print(f"無法啟動本機網站：{error}")
         return
     url = f"http://{HOST}:{PORT}"
-    print(f"Running Analytics v{APP_VERSION}: {url}")
+    print(f"CoachOS v{APP_VERSION}: {url}")
     open_browser_later(url)
     try:
         server.serve_forever()

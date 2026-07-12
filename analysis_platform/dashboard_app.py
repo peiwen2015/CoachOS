@@ -33,6 +33,12 @@ ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = ROOT.parent
 DEFAULT_DB_PATH = ROOT / "running_analytics.sqlite"
 ASSETS_DIR = PROJECT_ROOT / "assets"
+COACHOS_LOGO_DARK = "coachos_logo_dark.png"
+COACHOS_WORDMARK = "coachos_wordmark.png"
+COACHOS_TRANSPARENT_LOGO = "coachos_logo_transparent.png"
+COACHOS_BANNER = "coachos_banner.png"
+COACHOS_LOGO = "coachos_logo.png"
+COACHOS_JOURNEY = "journey.png"
 CONFIG_PATH = PROJECT_ROOT / "config" / "dropdown_options.json"
 AI_REPLY_STORE_PATH = PROJECT_ROOT / "config" / "local_ai_replies.json"
 AI_REPLIES_DIR = PROJECT_ROOT / "AI_REPLIES"
@@ -2880,16 +2886,16 @@ def ensure_rac_running():
 
 def rac_entry_panel():
     href = "/open-rac"
-    status = "資料匯入工具已就緒" if rac_is_running() else "從這裡進入 FIT 匯入與資料整理"
+    status = "CoachOS Import Studio 已就緒" if rac_is_running() else "從這裡進入 CoachOS Import Studio"
     note = (
-        "把 FIT 轉成 Excel、補活動資訊、寫回 SQLite，然後再回到 Running Intelligence Platform 繼續看 Activity、Weekly、Monthly。"
+        "把 FIT 轉成 Excel、補活動資訊、寫回 SQLite，然後再回到 CoachOS 繼續看 Activity、Weekly、Monthly。"
     )
     return f"""
       <section class="panel-section">
         <h2>資料入口</h2>
         <div class="coach-attention-card">
           <span>資料匯入工具</span>
-          <strong>先進入 FIT 匯入與資料整理</strong>
+          <strong>先進入 CoachOS Import Studio</strong>
           <p>{html.escape(note)}</p>
           <div class="coach-attention-footer">
             <a class="desk-link" href="{html.escape(href, quote=True)}">進入資料匯入工具</a>
@@ -7091,45 +7097,74 @@ def base_styles():
     return """
     :root {
       color-scheme: light;
-      --ink: #18222f;
-      --muted: #657386;
-      --line: #d9e3ee;
-      --accent: #0f766e;
-      --page: #f3f7fa;
+      --ink: #16243a;
+      --muted: #5f7088;
+      --line: rgba(22, 36, 58, 0.10);
+      --accent: #3cc9c7;
+      --accent-deep: #143255;
+      --accent-soft: #e8fbf7;
+      --teal: #11a89f;
+      --mint: #c8f4dc;
+      --page: #f5f8fc;
+      --surface: rgba(255, 255, 255, 0.82);
+      --surface-strong: #ffffff;
+      --shadow: 0 20px 44px rgba(18, 35, 58, 0.08);
+      --shadow-strong: 0 26px 54px rgba(18, 35, 58, 0.12);
     }
     * { box-sizing: border-box; }
+    html {
+      scroll-behavior: smooth;
+    }
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
-      background: linear-gradient(180deg, #edf5f7 0, var(--page) 260px), var(--page);
+      background:
+        radial-gradient(circle at 16% 0%, rgba(60, 201, 199, 0.12), transparent 30%),
+        radial-gradient(circle at 92% 18%, rgba(60, 201, 199, 0.08), transparent 26%),
+        linear-gradient(180deg, #ffffff 0%, #f9fcfc 58%, #f1fbf9 100%),
+        var(--page);
       color: var(--ink);
+      min-height: 100vh;
     }
     main {
-      width: min(1120px, calc(100vw - 32px));
-      margin: 28px auto 40px;
+      position: relative;
+      z-index: 0;
+      width: min(1180px, calc(100vw - 32px));
+      margin: 26px auto 44px;
     }
     .hero {
       margin: 0 0 18px;
-      padding: 28px 32px;
-      border-radius: 18px;
-      color: #fff;
-      background:
-        linear-gradient(90deg, rgba(3, 33, 48, 0.78) 0%, rgba(5, 55, 65, 0.46) 52%, rgba(5, 87, 88, 0.2) 100%),
-        url("/assets/rac_banner.png") center / cover no-repeat;
-      box-shadow: 0 18px 48px rgba(11, 79, 95, 0.22);
-      min-height: 220px;
+      padding: 28px 30px;
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      border-radius: 28px;
+      color: var(--ink);
+      background: linear-gradient(180deg, #ffffff 0%, #f9fcfc 55%, #f1fbf9 100%);
+      box-shadow: var(--shadow);
+      min-height: 240px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -44px;
+      bottom: -44px;
+      width: 240px;
+      height: 240px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(60, 201, 199, 0.10) 0%, rgba(60, 201, 199, 0.04) 45%, transparent 72%);
+      pointer-events: none;
     }
     .hero h1 {
       margin: 0;
-      font-size: 42px;
-      line-height: 1.15;
+      font-size: 38px;
+      line-height: 1.1;
       letter-spacing: 0;
-      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.24);
     }
     .hero p {
       max-width: 720px;
       margin: 16px 0 0;
-      color: rgba(255, 255, 255, 0.86);
+      color: var(--muted);
       line-height: 1.6;
     }
     .page-nav {
@@ -7145,7 +7180,7 @@ def base_styles():
       padding: 0 14px;
       border: 1px solid var(--line);
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.82);
+      background: rgba(255, 255, 255, 0.84);
       color: var(--muted);
       font-size: 13px;
       font-weight: 800;
@@ -7153,25 +7188,29 @@ def base_styles():
       letter-spacing: 0;
     }
     .nav-link.active {
-      background: var(--ink);
-      border-color: var(--ink);
+      background: linear-gradient(135deg, var(--accent-deep), var(--teal));
+      border-color: transparent;
       color: #fff;
     }
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 12px;
-      margin: 0 0 18px;
+    .nav-link-secondary {
+      color: var(--accent-deep);
+      background: rgba(60, 201, 199, 0.10);
     }
     .metric-card {
       min-height: 82px;
       display: grid;
       align-content: space-between;
       padding: 16px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fff;
-      box-shadow: 0 8px 22px rgba(31, 41, 51, 0.05);
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      border-radius: 18px;
+      background: var(--surface-strong);
+      box-shadow: var(--shadow);
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin: 0 0 18px;
     }
     .metric-card span {
       color: var(--muted);
@@ -7195,10 +7234,126 @@ def base_styles():
       min-height: 66px;
       padding: 12px;
       box-shadow: none;
-      background: rgba(255, 255, 255, 0.72);
+      background: rgba(255, 255, 255, 0.76);
     }
     .compact-metrics .metric-card strong {
       font-size: 18px;
+    }
+    .hero-shell {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 18px;
+      align-items: stretch;
+      margin: 0 0 18px;
+    }
+    .hero-card {
+      display: grid;
+      grid-template-columns: minmax(300px, 0.4fr) minmax(0, 0.6fr);
+      gap: 12px;
+      align-items: start;
+      min-height: 320px;
+      padding: 24px 30px;
+      border-radius: 30px;
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      background:
+        linear-gradient(180deg, #ffffff 0%, #fbfdfe 56%, #f3fbfa 100%),
+        var(--surface);
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      position: relative;
+    }
+    .hero-card::before {
+      content: "";
+      position: absolute;
+      inset: auto -10% -34% auto;
+      width: 360px;
+      height: 360px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(60, 201, 199, 0.08) 0, rgba(60, 201, 199, 0.03) 46%, transparent 74%);
+      pointer-events: none;
+    }
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      border-radius: 22px;
+      border: 1px solid rgba(20, 50, 85, 0.05);
+      pointer-events: none;
+    }
+    .hero-card-copy,
+    .hero-card-mark {
+      position: relative;
+      z-index: 1;
+    }
+    .hero-card-copy {
+      display: grid;
+      align-content: start;
+      justify-items: start;
+      gap: 22px;
+      color: var(--ink);
+      padding-top: 2px;
+    }
+    .hero-brand-image {
+      width: min(214px, 92%);
+      height: auto;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .hero-copy-stack {
+      display: grid;
+      gap: 16px;
+      align-content: start;
+      justify-items: start;
+      max-width: 420px;
+    }
+    .hero-page-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 38px;
+      padding: 0 15px;
+      border-radius: 999px;
+      background: rgba(60, 201, 199, 0.14);
+      color: var(--teal);
+      font-size: 12.5px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .hero-page-title {
+      margin: 0;
+      color: var(--ink);
+      font-size: clamp(40px, 3.8vw, 60px);
+      line-height: 1.06;
+      letter-spacing: -0.035em;
+      font-weight: 900;
+    }
+    .hero-page-hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16.5px;
+      line-height: 1.6;
+      font-weight: 700;
+      max-width: 36ch;
+      margin-top: 2px;
+    }
+    .hero-card-mark {
+      position: relative;
+      display: grid;
+      align-content: center;
+      justify-items: end;
+      text-align: right;
+      min-height: 260px;
+    }
+    .hero-banner-art {
+      width: min(700px, 100%);
+      height: auto;
+      max-height: 280px;
+      object-fit: contain;
+      filter: none;
+      opacity: 1;
+      pointer-events: none;
+      user-select: none;
     }
     .archive-strip {
       opacity: 0.9;
@@ -7219,9 +7374,9 @@ def base_styles():
     .ai-reply-parse-state {
       margin: 4px 0 0;
       padding: 10px 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #f7fafb;
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      border-radius: 18px;
+      background: rgba(232, 251, 247, 0.8);
       color: var(--muted);
       font-size: 13px;
       font-weight: 700;
@@ -7232,9 +7387,9 @@ def base_styles():
       gap: 8px;
       margin-top: 10px;
       padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #f7fafb;
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      border-radius: 18px;
+      background: rgba(248, 251, 253, 0.92);
     }
     .ai-reply-parsed-preview span {
       color: var(--muted);
@@ -7245,8 +7400,8 @@ def base_styles():
     .ai-reply-parsed-preview textarea {
       min-height: 180px;
       width: 100%;
-      border: 1px solid var(--line);
-      border-radius: 8px;
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      border-radius: 18px;
       padding: 12px;
       background: #fff;
       color: var(--ink);
@@ -7255,10 +7410,10 @@ def base_styles():
     }
     .table-wrap {
       overflow-x: auto;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fff;
-      box-shadow: 0 8px 22px rgba(31, 41, 51, 0.05);
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      border-radius: 18px;
+      background: var(--surface-strong);
+      box-shadow: var(--shadow);
     }
     .table-wrap tr:target {
       background: #fff8ef;
@@ -7278,7 +7433,7 @@ def base_styles():
       vertical-align: middle;
     }
     th {
-      background: #f7fafb;
+      background: rgba(245, 248, 252, 0.96);
       font-weight: 800;
     }
     tr:last-child td {
@@ -7308,10 +7463,10 @@ def base_styles():
       overflow-x: auto;
       margin: 12px 0;
       padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #fff;
-      box-shadow: 0 8px 22px rgba(31, 41, 51, 0.05);
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      border-radius: 18px;
+      background: var(--surface-strong);
+      box-shadow: var(--shadow);
     }
     .chart-panel svg {
       width: 100%;
@@ -8590,10 +8745,128 @@ def base_styles():
       font-size: 13px;
       color: var(--ink);
     }
+    .today-status,
+    .today-suggestion,
+    .today-latest,
+    .coach-desk-card,
+    .coach-attention-card,
+    .coach-route-card,
+    .intelligence-panel,
+    .intelligence-metric,
+    .coach-summary,
+    .review-header,
+    .review-card,
+    .driver-row,
+    .journey-step,
+    .journey-turning-point,
+    .journey-session-card,
+    .coach-timeline-step,
+    .scope-link,
+    .month-selector-bar,
+    .metadata-form,
+    .metadata-batch-bar,
+    .ai-handoff-block,
+    .ai-handoff-preview textarea,
+    .ai-reply-form textarea,
+    .ai-reply-raw textarea,
+    .table-wrap,
+    .chart-panel,
+    .status,
+    .pager-link,
+    .inline-jump-link,
+    .detail-chip,
+    .inline-field select,
+    .inline-field input,
+    .month-selector-form select,
+    .metadata-form select,
+    .metadata-batch-bar select {
+      border-radius: 18px;
+    }
+    .today-status,
+    .today-suggestion,
+    .today-latest,
+    .coach-desk-card,
+    .coach-attention-card,
+    .coach-route-card,
+    .intelligence-panel,
+    .review-header,
+    .review-card,
+    .driver-row,
+    .journey-step,
+    .journey-turning-point,
+    .journey-session-card,
+    .coach-timeline-step,
+    .scope-link,
+    .month-selector-bar,
+    .metadata-form,
+    .metadata-batch-bar,
+    .ai-handoff-block,
+    .table-wrap,
+    .chart-panel,
+    .status,
+    .metric-card {
+      border-color: rgba(22, 36, 58, 0.08);
+      box-shadow: var(--shadow);
+      background: var(--surface-strong);
+    }
+    .review-card,
+    .coach-desk-card,
+    .coach-attention-card,
+    .coach-route-card,
+    .journey-step,
+    .journey-turning-point,
+    .journey-session-card,
+    .coach-timeline-step,
+    .scope-link {
+      backdrop-filter: blur(16px);
+    }
+    .review-card span,
+    .coach-desk-card span,
+    .coach-attention-card > span,
+    .coach-route-card span,
+    .journey-step span,
+    .journey-turning-point span,
+    .journey-session-card span,
+    .coach-timeline-step span,
+    .scope-link span,
+    .metric-card span,
+    .intelligence-metric span,
+    .coach-summary span {
+      letter-spacing: 0.06em;
+    }
+    .review-card strong,
+    .coach-desk-card strong,
+    .coach-attention-card strong,
+    .coach-route-card strong,
+    .journey-step strong,
+    .journey-turning-point strong,
+    .journey-session-card strong,
+    .coach-timeline-step strong,
+    .scope-link strong {
+      letter-spacing: -0.01em;
+    }
+    .hero-card-mark p {
+      margin: 0;
+      color: rgba(80, 96, 120, 0.88);
+      line-height: 1.55;
+      font-size: 14px;
+      max-width: 320px;
+    }
     @media (max-width: 760px) {
       main { width: min(100vw - 20px, 1040px); margin: 18px auto; }
-      .hero { padding: 22px; border-radius: 14px; min-height: 0; }
-      .hero h1 { font-size: 30px; }
+      .hero { padding: 20px; border-radius: 18px; min-height: 0; }
+      .hero-shell,
+      .hero-card {
+        grid-template-columns: 1fr;
+      }
+    .hero-card-mark {
+        justify-items: start;
+        text-align: left;
+        min-height: 0;
+      }
+      .hero-banner-art {
+        width: min(480px, 92vw);
+      }
       .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .metric-card strong { font-size: 20px; }
       .weekly-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -8619,8 +8892,53 @@ def base_styles():
       .scope-link-grid { grid-template-columns: 1fr; }
       .month-selector-bar { flex-direction: column; align-items: stretch; }
       .month-selector-form { width: 100%; }
-      .ai-handoff-block-head { grid-template-columns: 1fr; }
+    .ai-handoff-block-head { grid-template-columns: 1fr; }
+  }
+    """
+
+
+def page_hero(page):
+    page_labels = {
+        "home": ("Today Focus", "今天先看恢復", "先把恢復顧好，再看本週真正留下了什麼。"),
+        "activity": ("Activity", "這堂課留下了什麼", "把單次活動整理成可理解的回顧。"),
+        "weekly": ("Weekly", "這週留下了什麼", "先看本週狀態，再看下一步。"),
+        "monthly": ("Monthly", "現在走到哪裡", "用月度節奏看趨勢與轉折。"),
+        "journey": ("Journey", "時間怎麼串起來", "把每個月串成一段旅程。"),
+        "shoes": ("Shoes", "鞋款如何分工", "讓鞋款資訊變成決策。"),
+        "training": ("Training", "訓練結構", "先看結構，再看缺口。"),
+        "metadata": ("Annotation", "今天還缺哪些標註", "把缺口補齊，讓系統更誠實。"),
     }
+    page_slug, page_title, page_hint = page_labels.get(page, page_labels["home"])
+    cta_map = {
+        "home": ("查看本週反思", "/?page=weekly"),
+        "activity": ("查看本週回顧", "/?page=weekly"),
+        "weekly": ("查看月回顧", "/?page=monthly"),
+        "monthly": ("查看旅程", "/?page=journey"),
+        "journey": ("查看標註缺口", "/?page=metadata"),
+        "shoes": ("查看訓練頁", "/?page=training"),
+        "training": ("開始補標註", "/?page=metadata"),
+        "metadata": ("開始補標註", "/?page=metadata"),
+    }
+    cta_label, cta_href = cta_map.get(page, cta_map["home"])
+    logo_src = f"/assets/{COACHOS_LOGO}" if (ASSETS_DIR / COACHOS_LOGO).exists() else "/assets/coachos_logo_transparent.png"
+    journey_src = f"/assets/{COACHOS_JOURNEY}" if (ASSETS_DIR / COACHOS_JOURNEY).exists() else "/assets/coachos_banner.png"
+    return f"""
+    <section class="hero-shell">
+      <section class="hero-card">
+        <div class="hero-card-copy">
+          <img class="hero-brand-image" src="{html.escape(logo_src, quote=True)}" alt="CoachOS">
+          <div class="hero-copy-stack">
+            <div class="hero-page-chip">{html.escape(page_slug)}</div>
+            <h2 class="hero-page-title">{html.escape(page_title)}</h2>
+            <p class="hero-page-hint">{html.escape(page_hint)}</p>
+            <a class="desk-link" href="{html.escape(cta_href, quote=True)}">{html.escape(cta_label)}</a>
+          </div>
+        </div>
+        <div class="hero-card-mark">
+          <img class="hero-banner-art" src="{html.escape(journey_src, quote=True)}" alt="CoachOS journey">
+        </div>
+      </section>
+    </section>
     """
 
 
@@ -8729,16 +9047,13 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Running Intelligence Platform</title>
+  <title>CoachOS</title>
   <style>{base_styles()}</style>
   {handoff_script}
 </head>
 <body>
   <main>
-    <section class="hero">
-      <h1>Running Intelligence Platform</h1>
-      <p>先匯入第一批跑步資料，平台才會開始整理出 Activity、Weekly、Monthly 與 Overview。</p>
-    </section>
+    {page_hero(page)}
     {page_nav(page)}
     {message and f'<section class="status">{html.escape(message)}</section>' or ""}
     {no_data_yet_panel()}
@@ -8906,17 +9221,13 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Running Intelligence Platform</title>
+  <title>CoachOS</title>
   <style>{base_styles()}</style>
   {handoff_script}
 </head>
 <body>
   <main>
-    <section class="hero">
-      <h1>Running Intelligence Platform</h1>
-      <p>把治理後的跑步資料，整理成以教練視角出發的訓練回顧與判讀。</p>
-    </section>
-
+    {page_hero(page)}
     {page_nav(page)}
 """
     message_html = f'<section class="status">{html.escape(message)}</section>' if message else ""
@@ -9222,7 +9533,7 @@ def open_browser_later(url):
 
 def main():
     global DB_PATH
-    parser = argparse.ArgumentParser(description="Run the Running Analytics dashboard.")
+    parser = argparse.ArgumentParser(description="Run the CoachOS dashboard.")
     parser.add_argument("db", nargs="?", type=Path, default=DEFAULT_DB_PATH)
     parser.add_argument("--host", default=HOST)
     parser.add_argument("--port", type=int, default=PORT)
@@ -9234,7 +9545,7 @@ def main():
     if not args.no_browser:
         open_browser_later(url)
     server = ThreadingHTTPServer((args.host, args.port), DashboardHandler)
-    print(f"Running Intelligence Dashboard: {url}")
+    print(f"CoachOS Dashboard: {url}")
     print(f"SQLite database: {DB_PATH}")
     server.serve_forever()
 

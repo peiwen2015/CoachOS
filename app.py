@@ -1226,25 +1226,25 @@ def workout_focus_reference_table(dropdown_options):
     """
 
 
-def product_banner(title="CoachOS Import Studio"):
+def product_banner(title="資料匯入工具"):
     return f"""
       <section class="product-banner">
         <div class="banner-copy">
-          <div class="brand-row">
-            <img class="brand-mark" src="/assets/coachos_logo_transparent.png" alt="CoachOS Import Studio">
-            <div>
-              <h1>{html.escape(title)}</h1>
-              <p class="brand-subtitle">COACHOS · FIT IMPORT & DATA PREP</p>
+          <img class="brand-mark" src="/assets/coachos_logo.png" alt="CoachOS">
+          <div class="banner-stack">
+            <div class="banner-chip">Studio</div>
+            <h1>{html.escape(title)}</h1>
+            <p class="banner-subtitle">把 Garmin FIT 轉成 CoachOS 可讀的資料</p>
+            <div class="flow">
+              <span>FIT Import</span>
+              <span>{html.escape(EXCEL_SCHEMA_LABEL)}</span>
+              <span>CoachOS</span>
             </div>
+            <p class="banner-note">支援每日判讀、週/月趨勢與長期追蹤。</p>
           </div>
-          <p class="banner-subtitle">Garmin FIT → Standardized Excel → CoachOS Analysis</p>
-          <div class="flow">
-            <span>FIT Import</span>
-            <span>{html.escape(EXCEL_SCHEMA_LABEL)}</span>
-            <span>CoachOS</span>
-            <span>Long-term Analytics</span>
-          </div>
-          <p class="banner-note">將 Garmin FIT 活動檔轉換為固定格式 Excel，支援每日 CoachOS 判讀、週/月趨勢與長期跑步資料庫。</p>
+        </div>
+        <div class="banner-art">
+          <img src="/assets/journey.png" alt="CoachOS journey">
         </div>
       </section>
     """
@@ -1316,73 +1316,102 @@ def base_styles():
     }
     .product-banner {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 24px;
-      align-items: start;
+      grid-template-columns: minmax(260px, 0.30fr) minmax(0, 0.70fr);
+      gap: 14px;
+      align-items: center;
       margin: 0 0 18px;
-      padding: 30px 32px;
-      border-radius: 26px;
-      color: #fff;
+      padding: 24px 28px;
+      border: 1px solid rgba(22, 36, 58, 0.08);
+      border-radius: 28px;
+      color: var(--ink);
       background:
-        linear-gradient(110deg, rgba(9, 24, 44, 0.92) 0%, rgba(14, 37, 67, 0.82) 48%, rgba(22, 137, 141, 0.64) 100%),
-        url("/assets/rac_banner.png") center / cover no-repeat;
+        linear-gradient(180deg, #ffffff 0%, #f9fcfc 55%, #f1fbf9 100%),
+        var(--surface);
       box-shadow: var(--shadow);
-      min-height: 286px;
+      min-height: 260px;
       position: relative;
       overflow: hidden;
     }
     .product-banner::after {
       content: "";
       position: absolute;
-      inset: 0;
-      background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.08), transparent 38%),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.05), transparent 52%);
-      mix-blend-mode: screen;
+      inset: auto -6% -28% auto;
+      width: 260px;
+      height: 260px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(60, 201, 199, 0.10) 0%, rgba(60, 201, 199, 0.04) 45%, transparent 72%);
       pointer-events: none;
-    }
-    .eyebrow {
-      margin: 0 0 8px;
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.76);
     }
     .product-banner h1 {
       margin: 0;
-      font-size: 42px;
-      line-height: 1.15;
-      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.24);
+      font-size: clamp(34px, 3vw, 52px);
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      color: var(--ink);
     }
-    .brand-row {
+    .banner-copy {
+      position: relative;
+      z-index: 1;
       display: flex;
-      align-items: center;
-      gap: 24px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 20px;
     }
     .brand-mark {
-      width: min(320px, 32vw);
+      width: min(240px, 72vw);
       height: auto;
-      filter: drop-shadow(0 16px 28px rgba(0, 0, 0, 0.34));
+      display: block;
     }
-    .brand-subtitle {
-      margin: 8px 0 0;
-      color: rgba(220, 243, 244, 0.84);
-      font-size: 18px;
+    .banner-stack {
+      display: grid;
+      gap: 12px;
+      max-width: 520px;
+    }
+    .banner-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      width: fit-content;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: rgba(60, 201, 199, 0.10);
+      color: var(--accent-dark);
+      font-size: 10.5px;
       font-weight: 800;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.05em;
       text-transform: uppercase;
+      line-height: 1;
+      opacity: 0.92;
     }
     .banner-subtitle {
-      margin: 18px 0 0;
+      margin: 0;
       font-size: 16px;
-      color: rgba(255, 255, 255, 0.86);
+      color: var(--muted);
+      font-weight: 700;
     }
     .banner-note {
-      max-width: 720px;
-      margin: 16px 0 0;
-      color: rgba(255, 255, 255, 0.86);
+      max-width: 640px;
+      margin: 0;
+      color: var(--muted);
       line-height: 1.6;
+    }
+    .banner-art {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      align-items: center;
+      justify-items: end;
+      min-height: 200px;
+      margin-right: -8px;
+    }
+    .banner-art img {
+      width: min(640px, 100%);
+      height: auto;
+      max-height: 260px;
+      object-fit: contain;
+      display: block;
+      user-select: none;
+      pointer-events: none;
     }
     .subtitle {
       margin: 0 0 18px;
@@ -1392,22 +1421,23 @@ def base_styles():
     }
     .flow {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 18px 0 0;
+      flex-wrap: nowrap;
+      gap: 6px;
+      margin: 0;
     }
     .flow span {
-      color: #fff;
-      background: rgba(255, 255, 255, 0.14);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: var(--accent-dark);
+      background: rgba(60, 201, 199, 0.10);
+      border: 1px solid rgba(60, 201, 199, 0.16);
       border-radius: 999px;
-      padding: 7px 10px;
-      font-size: 13px;
+      padding: 6px 8px;
+      font-size: 12px;
       font-weight: 700;
+      white-space: nowrap;
     }
     .flow span + span::before {
       content: "→ ";
-      opacity: 0.78;
+      opacity: 0.7;
     }
     nav {
       display: flex;
@@ -1434,7 +1464,10 @@ def base_styles():
     }
     .nav-link-secondary {
       color: var(--accent-dark);
-      background: rgba(60, 201, 199, 0.10);
+      background: rgba(60, 201, 199, 0.06);
+      border: 1px solid rgba(60, 201, 199, 0.12);
+      box-shadow: none;
+      padding-inline: 12px;
     }
     form {
       background: var(--surface);
@@ -1665,18 +1698,21 @@ def base_styles():
       .product-banner {
         grid-template-columns: 1fr;
         padding: 22px;
-        border-radius: 14px;
+        border-radius: 18px;
         min-height: 0;
       }
-      .brand-row {
-        display: grid;
-        gap: 12px;
-      }
       .brand-mark {
-        width: min(260px, 78vw);
+        width: min(220px, 74vw);
+      }
+      .banner-art {
+        justify-items: start;
+        min-height: 0;
+        margin-right: 0;
+      }
+      .banner-art img {
+        width: min(560px, 92vw);
       }
       .product-banner h1 { font-size: 30px; }
-      .brand-subtitle { font-size: 14px; }
       form { padding: 16px; }
       .grid { grid-template-columns: 1fr; }
       label.wide { grid-column: span 1; }

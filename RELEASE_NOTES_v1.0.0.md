@@ -1,13 +1,13 @@
-# Running Intelligence Platform v1.0.0
+# CoachOS v1.0.0
 
-Running Intelligence Platform 的第一個正式版本。
+CoachOS 的第一個正式版本。
 
 `v1.0.0` 是正式起點，這次把資料匯入、產品語意和對外入口收斂成一條穩定的本機產品鏈路。
 
 ## Highlights
 
 - `資料匯入工具` 正式納入產品流程，負責 `FIT -> Excel -> SQLite`
-- `Running Intelligence Platform` 成為對外主名稱
+- `CoachOS` 成為對外主名稱
 - `Semantic Layer v1.0` 成為 Dashboard 與 Query Layer 的產品語意層
 - `SQLite Schema v1.0` 完成真實資料驗證
 - `Metadata Repository v1.1` 成為名詞與規則的治理基礎

@@ -18,7 +18,7 @@ if not errorlevel 1 (
 
 if "%PYTHON_CMD%"=="" (
   echo.
-  echo [Running Intelligence Platform]
+  echo [CoachOS]
   echo Python was not found, so the app cannot start.
   echo.
   echo Please install Python 3.11 or newer:
@@ -75,7 +75,7 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr /R /C:":8766 .*LISTENING"') d
   taskkill /PID %%a /F >nul 2>nul
 )
 
-echo Starting Running Intelligence Platform...
+echo Starting CoachOS...
 echo The platform will open first. Use the homepage button when you want to enter RAC.
 "%VENV_PY%" analysis_platform\dashboard_app.py analysis_platform\running_analytics.sqlite --port 8766
 

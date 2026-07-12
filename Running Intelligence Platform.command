@@ -56,9 +56,9 @@ then
 fi
 
 stop_server_on_port "$IMPORT_TOOL_PORT" "資料匯入工具"
-stop_server_on_port "$DASHBOARD_PORT" "Running Intelligence Platform"
+stop_server_on_port "$DASHBOARD_PORT" "CoachOS"
 
-echo "啟動 Running Intelligence Platform..."
+echo "啟動 CoachOS..."
 echo "首頁會先打開平台；需要轉檔時，再從首頁進入 RAC。"
 echo ""
 echo "平台網址：http://127.0.0.1:$DASHBOARD_PORT/"

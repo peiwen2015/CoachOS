@@ -2,7 +2,7 @@
 
 ## Purpose
 
-These principles define the long-term design philosophy of the Personal Running Intelligence Platform.
+These principles define the long-term design philosophy of CoachOS.
 
 They are higher-level than implementation rules and broader than individual ADRs.
 
@@ -51,4 +51,3 @@ Activity-level data belongs in `activity`; split-level data belongs in `kilomete
 Architecture governance should reduce rework.
 
 The goal is not slower development; the goal is fewer ambiguous decisions, fewer duplicate definitions, and faster implementation once the model is approved.
-

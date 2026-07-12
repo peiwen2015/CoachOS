@@ -2,7 +2,7 @@
 
 ## Project Position
 
-Personal Running Intelligence Platform is built Metadata-First.
+CoachOS is built Metadata-First.
 
 Every data element is governed before it is implemented.
 

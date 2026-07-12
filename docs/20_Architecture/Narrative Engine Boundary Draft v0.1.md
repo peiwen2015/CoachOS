@@ -4,7 +4,7 @@
 
 Narrative Engine is the next architecture layer after Semantic Layer.
 
-It is the **Source of Understanding** for the Personal Running Intelligence Platform.
+It is the **Source of Understanding** for CoachOS.
 
 Its job is not to generate pages.
 

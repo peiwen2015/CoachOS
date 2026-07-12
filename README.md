@@ -1,4 +1,4 @@
-# Running Intelligence Platform
+# CoachOS
 
 一個以跑者與教練視角設計的本機產品。
 
@@ -7,21 +7,21 @@
 ## Release Status
 
 - `v1.0.0` 已正式發布
-- 產品對外主名稱維持 `Running Intelligence Platform`
+- 產品對外主名稱維持 `CoachOS`
 - 核心資料鏈路已固定為 `FIT -> Excel -> SQLite -> Semantic Layer -> Dashboard`
 
 目前產品由兩個一起工作的本機小程式組成：
 
 - `資料匯入工具`  
   負責 `FIT -> Excel -> SQLite`
-- `Running Intelligence Platform`  
+- `CoachOS`  
   負責 `Activity / Overview / Weekly / Monthly` 的教練式判讀
 
 ---
 
 ## 這個專案目前在做什麼
 
-Running Intelligence Platform 現在主要提供四個產品面：
+CoachOS 現在主要提供四個產品面：
 
 - `Activity`：這堂課，我真正練到了什麼？
 - `Overview`：今天，我最該關心的是什麼？
@@ -40,18 +40,18 @@ Running Intelligence Platform 現在主要提供四個產品面：
 pip install -r requirements.txt
 ```
 
-### 2. 啟動 Running Intelligence Platform
+### 2. 啟動 CoachOS
 
 macOS：
 
 ```text
-Running Intelligence Platform.command
+CoachOS.command
 ```
 
 Windows：
 
 ```text
-Running Intelligence Platform.bat
+CoachOS.bat
 ```
 
 雙擊後會先打開平台首頁；需要轉檔與匯入時，再從首頁進入資料匯入工具。
@@ -119,7 +119,7 @@ Weekly / Monthly / Shoes
 ```text
 app.py                             資料匯入工具
 fit_to_excel.py                    FIT 轉 Excel 主程式
-analysis_platform/dashboard_app.py Running Intelligence Platform
+analysis_platform/dashboard_app.py CoachOS
 analysis_platform/running_analytics.sqlite
                                    本機 SQLite 資料庫
 config/dropdown_options.json       下拉選單設定
@@ -168,7 +168,7 @@ docs/      架構與產品文件
 
 這個 repo 現在就是正式對外的 `v1.0.0` 版本，後續會在這個基礎上持續收斂：
 
-- 統一名稱：`Running Intelligence Platform`
+- 統一名稱：`CoachOS`
 - 把資料匯入工具作為產品裡的資料入口，而不是獨立散落的小工具
 - 以 deterministic、本機可用、knowledge-first 的方式建立跑步教練產品
 

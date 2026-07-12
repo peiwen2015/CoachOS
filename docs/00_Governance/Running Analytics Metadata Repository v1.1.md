@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This file is the metadata repository for the Personal Running Intelligence Platform: data catalog, data dictionary, data lineage, data governance, and data lifecycle reference.
+This file is the metadata repository for CoachOS: data catalog, data dictionary, data lineage, data governance, and data lifecycle reference.
 
 It answers:
 

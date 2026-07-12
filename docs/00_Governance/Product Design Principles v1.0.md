@@ -2,7 +2,7 @@
 
 ## Purpose
 
-These principles define the product experience philosophy of the Personal Running Intelligence Platform.
+These principles define the product experience philosophy of CoachOS.
 
 They sit above individual pages and features.
 
@@ -170,7 +170,7 @@ User tries to infer meaning alone
 
 ## Product Position
 
-Running Intelligence is not just data access.
+CoachOS is not just data access.
 
 It is the ability to:
 

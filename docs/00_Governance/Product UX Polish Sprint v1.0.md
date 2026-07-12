@@ -14,7 +14,7 @@ From Dashboard App v0.5 onward, new product surfaces should be reviewed against 
 
 ## Sprint Goal
 
-Transform the Personal Running Intelligence Platform from:
+Transform CoachOS from:
 
 `Analytics Dashboard`
 

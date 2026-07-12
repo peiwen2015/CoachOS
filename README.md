@@ -34,6 +34,17 @@ CoachOS 現在主要提供四個產品面：
 
 ---
 
+## AI 回覆與圖檔
+
+CoachOS 會把貼回來的 AI 回覆與附加圖檔存到專案根目錄下的 `AI_REPLIES/`。
+
+- 文字回覆與 metadata：`AI_REPLIES/<surface>/<identifier>.json` 與 `.md`
+- 圖檔附件：`AI_REPLIES/<surface>/<identifier>/attachments/`
+
+例如單堂課、週回顧、月回顧的圖檔都會各自放在對應的附件資料夾裡。
+
+---
+
 ## 本機使用方式
 
 ### 1. 安裝需求

@@ -824,6 +824,18 @@ def weekly_history(connection):
     ).fetchall()
 
 
+def weekly_history_with_labels(connection, rows):
+    labeled = []
+    for row in rows or []:
+        intelligence = selected_week_intelligence(connection, row["week_offset"])
+        review = weekly_review_payload(row, intelligence) if intelligence else None
+        labeled.append({
+            "row": row,
+            "coach_label": review["verdict"] if review else "—",
+        })
+    return labeled
+
+
 def weekly_intelligence(connection):
     row = connection.execute("SELECT * FROM current_week_intelligence_view").fetchone()
     if not row:
@@ -4025,7 +4037,7 @@ def weekly_reasoning_rows(intelligence, distribution_rows):
         if delta >= positive_threshold:
             return ("up", f"較基準 {format_delta_pct(delta)}")
         if delta <= negative_threshold:
-            return ("down", f"較基準 {abs(delta):.0f}%")
+            return ("down", f"較基準 {format_delta_pct(delta)}")
         return ("steady", "大致貼近基準")
 
     def stimulus_level(quality_count, long_run_count):
@@ -4155,7 +4167,18 @@ def weekly_structure_card(distribution_rows):
     """
 
 
-def weekly_ai_handoff_text(weekly, intelligence, review, distribution_rows, key_session_rows, history_rows, include_raw_data=False):
+def weekly_ai_handoff_text(
+    weekly,
+    intelligence,
+    review,
+    distribution_rows,
+    key_session_rows,
+    history_rows,
+    history_rows_with_labels=None,
+    monthly_overview=None,
+    overview_attention=None,
+    include_raw_data=False,
+):
     if not weekly or not intelligence or not review:
         return ""
 
@@ -4165,50 +4188,101 @@ def weekly_ai_handoff_text(weekly, intelligence, review, distribution_rows, key_
     activities_text = str(weekly["activities"] or 0)
     avg_pace_text = format_pace_seconds(weekly["avg_pace_sec_per_km"]) or "—"
     avg_hr_text = "" if weekly["avg_hr"] is None else str(int(round(weekly["avg_hr"])))
+    distribution_snapshot = weekly_distribution_snapshot(distribution_rows)
+    confidence = "High"
+    if intelligence["load_delta"] is None or intelligence["km_delta"] is None:
+        confidence = "Medium"
 
     cause_lines = [
         f"- {row['label']}：{row['note']}"
         for row in weekly_reasoning_rows(intelligence, distribution_rows)
     ]
+    if review["verdict"] == "吸收週":
+        rhythm_note = "品質課有回來，但恢復與輕鬆跑仍維持主要節奏。"
+    elif review["verdict"] == "建構週":
+        rhythm_note = "本週的刺激有往前推，但恢復安排還沒有被擠掉。"
+    else:
+        top_purpose = distribution_snapshot["top_purpose"]
+        rhythm_label_map = {
+            "Aerobic Base": "有氧基礎",
+            "Endurance": "耐力",
+            "Recovery": "恢復",
+            "Threshold": "門檻",
+            "Race Specific": "比賽專項",
+            "Unassigned": "未標註",
+        }
+        top_label = rhythm_label_map.get(top_purpose, top_purpose or "目前訓練")
+        rhythm_note = f"目前仍以{top_label}為主，這週學習也主要是從這裡長出來。"
+    cause_lines.append(f"- 整體節奏：{rhythm_note}")
 
-    key_session_lines = []
+    grouped_sessions = {}
     session_label_map = {
         "Longest Run": "最長一課",
         "Highest Load": "最高負荷",
         "Fastest Quality": "最快品質課",
         "Lowest HR Easy": "最低心率輕鬆跑",
     }
-    seen = set()
+    session_reason_map = {
+        "Longest Run": "它代表這週耐力主線是否還在。",
+        "Highest Load": "它最能說明這週真正把壓力放在哪裡。",
+        "Fastest Quality": "它是這週品質刺激最清楚的一堂。",
+        "Lowest HR Easy": "它最能證明這週有沒有把恢復接住。",
+    }
     for row in key_session_rows or []:
         key = str(row["key_session_type"])
-        if key in seen:
-            continue
-        seen.add(key)
+        group_key = row["activity_id"]
+        if group_key not in grouped_sessions:
+            grouped_sessions[group_key] = {
+                "activity": str(row["activity_name"] or row["activity_type"] or "活動"),
+                "date": format_short_datetime(row["activity_start_time"]),
+                "workout": str(row["workout_type_name_en"] or "未標註"),
+                "distance": format_number(row["distance_km"], 2) or "—",
+                "pace": format_pace_seconds(row["avg_pace_sec_per_km"]) or "—",
+                "hr": "" if row["avg_hr"] is None else int(round(row["avg_hr"])),
+                "load": format_number(row["training_load"], 1) or "—",
+                "shoe": str(row["shoe_display_name"] or "未標註"),
+                "labels": [],
+                "reasons": [],
+            }
+        grouped_sessions[group_key]["labels"].append(session_label_map.get(key, key))
+        reason = session_reason_map.get(key, "它補上了這週學習真正成立的那個片段。")
+        if reason not in grouped_sessions[group_key]["reasons"]:
+            grouped_sessions[group_key]["reasons"].append(reason)
+
+    key_session_lines = []
+    for session in grouped_sessions.values():
         key_session_lines.append(
-            "- {label}：{activity}；{date}；{workout}；{distance} km；配速 {pace}；HR {hr}；負荷 {load}；鞋款 {shoe}".format(
-                label=session_label_map.get(key, key),
-                activity=str(row["activity_name"] or row["activity_type"] or "活動"),
-                date=format_short_datetime(row["activity_start_time"]),
-                workout=str(row["workout_type_name_en"] or "未標註"),
-                distance=format_number(row["distance_km"], 2) or "—",
-                pace=format_pace_seconds(row["avg_pace_sec_per_km"]) or "—",
-                hr="" if row["avg_hr"] is None else int(round(row["avg_hr"])),
-                load=format_number(row["training_load"], 1) or "—",
-                shoe=str(row["shoe_display_name"] or "未標註"),
+            "- {labels}：{activity}；{date}；{workout}；{distance} km；配速 {pace}；HR {hr}；負荷 {load}；鞋款 {shoe}；Reasons：{reasons}".format(
+                labels=" / ".join(session["labels"]),
+                activity=session["activity"],
+                date=session["date"],
+                workout=session["workout"],
+                distance=session["distance"],
+                pace=session["pace"],
+                hr=session["hr"],
+                load=session["load"],
+                shoe=session["shoe"],
+                reasons=" / ".join(session["reasons"]),
             )
         )
+
+    context_lines = []
+    if overview_attention:
+        context_lines.append(f"- Overview Focus：{overview_attention.get('title') or '—'}")
+    if monthly_overview:
+        context_lines.append(f"- Monthly Position：{monthly_overview.get('verdict') or '—'}")
+        context_lines.append(f"- Monthly Summary：{monthly_overview.get('verdict_reason') or '—'}")
 
     prompt_lines = [
         "請根據以下已治理的跑步資料，用繁體中文做進一步分析。",
         "請先回答這週真正留下來的是什麼，再說明原因，最後只留一個下週提醒。",
         "只能根據我提供的內容分析，不要自行發明額外訓練、健康或心理狀態。",
         "",
-        "## Weekly Facts",
+        "## Weekly Snapshot",
         f"- 週期：{period_text}",
         f"- 活動數：{activities_text}",
         f"- 里程：{total_km}",
         f"- 負荷：{load_text}",
-        f"- 平均配速：{avg_pace_text}",
         f"- 平均心率：{avg_hr_text}",
         f"- 相對基準負荷：{format_delta_pct(intelligence['load_delta']) if intelligence['load_delta'] is not None else '基準建立中'}",
         f"- 相對基準里程：{format_delta_pct(intelligence['km_delta']) if intelligence['km_delta'] is not None else '—'}",
@@ -4216,6 +4290,7 @@ def weekly_ai_handoff_text(weekly, intelligence, review, distribution_rows, key_
         "## Coach Understanding",
         f"- 問題：{review['learning_question']}",
         f"- Verdict：{review['verdict']}",
+        f"- Confidence：{confidence}",
         f"- Learning：{review['learning']}",
         f"- Focus：{review['focus']}",
         f"- Why：{review['why']}",
@@ -4228,8 +4303,15 @@ def weekly_ai_handoff_text(weekly, intelligence, review, distribution_rows, key_
     if key_session_lines:
         prompt_lines.extend([
             "",
-            "## Attention Activities",
+            "## Key Activities Behind This Learning",
             *key_session_lines,
+        ])
+
+    if context_lines:
+        prompt_lines.extend([
+            "",
+            "## Context",
+            *context_lines,
         ])
 
     if include_raw_data and history_rows:
@@ -4237,22 +4319,42 @@ def weekly_ai_handoff_text(weekly, intelligence, review, distribution_rows, key_
             "",
             "## Evidence",
             "### 最近 5 週節奏",
-            "| 週別 | 期間 | 活動數 | KM | 時間 | 配速 | 平均心率 | 負荷 |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- |",
+            "| 週別 | Coach | 期間 | 活動數 | KM | 時間 | 配速 | 平均心率 | 負荷 |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         ])
-        for row in history_rows:
+        labeled_rows = history_rows_with_labels or [{"row": row, "coach_label": "—"} for row in history_rows]
+        for item in labeled_rows:
+            row = item["row"]
             prompt_lines.append(
-                "| {week} | {period} | {activities} | {km} | {duration} | {pace} | {hr} | {load} |".format(
+                "| {week} | {coach} | {period} | {activities} | {km} | {duration} | {pace} | {hr} | {load} |".format(
                     week=week_label_from_offset(row["week_offset"]),
+                    coach=item["coach_label"],
                     period=f"{row['start_date']} – {row['end_date']}",
                     activities=row["activities"],
                     km=format_number(row["total_km"], 2) or "—",
-                    duration=format_hours(row["total_time_sec"]) or "—",
+                    duration=format_duration_hms(row["total_time_sec"]) or "—",
                     pace=format_pace_seconds(row["avg_pace_sec_per_km"]) or "—",
                     hr="" if row["avg_hr"] is None else row["avg_hr"],
                     load="" if row["training_load"] is None else row["training_load"],
                 )
             )
+        if distribution_rows:
+            prompt_lines.extend([
+                "",
+                "### 這週訓練結構",
+                "| 課表 | 目的 | 活動數 | KM | 平均負荷 |",
+                "| --- | --- | --- | --- | --- |",
+            ])
+            for row in distribution_rows:
+                prompt_lines.append(
+                    "| {workout} | {purpose} | {count} | {km} | {load} |".format(
+                        workout=str(row["workout_type_name_en"] or "未標註"),
+                        purpose=str(row["primary_training_purpose_name_en"] or "未標註"),
+                        count=row["activity_count"],
+                        km=format_number(row["total_km"], 2) or "—",
+                        load=format_number(row["avg_training_load"], 1) or "—",
+                    )
+                )
 
     prompt_lines.extend([
         "",
@@ -4260,7 +4362,9 @@ def weekly_ai_handoff_text(weekly, intelligence, review, distribution_rows, key_
         "- 先講這週真正留下來的是什麼。",
         "- 再解釋為什麼平台會這樣判讀。",
         "- 最後只留一個下週提醒。",
+        "- 優先沿著 Coach Understanding → Reasoning → Key Activities → Evidence 的順序理解。",
         "- 如果你從最近 5 週節奏看見平台尚未明說、但值得注意的變化，可以補充提出。",
+        "- 如果平台判讀已經足以支持結論，不要因為 raw evidence 有更多資訊而重建另一套與平台相反的故事。",
         "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據 evidence 額外補充的觀察。",
         "- 如果 evidence 與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
     ])
@@ -4268,7 +4372,17 @@ def weekly_ai_handoff_text(weekly, intelligence, review, distribution_rows, key_
     return "\n".join(prompt_lines)
 
 
-def weekly_ai_handoff_panel(weekly, intelligence, review, distribution_rows, key_session_rows, history_rows):
+def weekly_ai_handoff_panel(
+    weekly,
+    intelligence,
+    review,
+    distribution_rows,
+    key_session_rows,
+    history_rows,
+    history_rows_with_labels=None,
+    monthly_overview=None,
+    overview_attention=None,
+):
     handoff_text = weekly_ai_handoff_text(
         weekly,
         intelligence,
@@ -4276,6 +4390,9 @@ def weekly_ai_handoff_panel(weekly, intelligence, review, distribution_rows, key
         distribution_rows,
         key_session_rows,
         history_rows,
+        history_rows_with_labels,
+        monthly_overview,
+        overview_attention,
         include_raw_data=True,
     )
     if not handoff_text:
@@ -4342,8 +4459,9 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
         verdict = "平衡建構"
         verdict_reason = "本月方向整體平衡，里程、品質課與長跑配置都還在合理範圍內。"
 
+    confidence = "Medium" if intelligence["is_partial_month"] else "High"
+
     letter = monthly_letter_payload(monthly, intelligence, verdict, phase, progress_pct)
-    why_points = monthly_briefing_why_points(monthly, intelligence, progress_row, coach_memory)
 
     week_lines = [
         "- {period}：{verdict}；活動 {activities}；{km} km；負荷 {load}；{note}".format(
@@ -4357,30 +4475,54 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
         for row in related_week_rows or []
     ]
 
-    key_session_lines = []
+    grouped_sessions = {}
     session_label_map = {
         "Longest Run": "最長一課",
         "Highest Load": "最高負荷",
         "Fastest Quality": "最快品質課",
         "Lowest HR Easy": "最低心率輕鬆跑",
     }
-    seen = set()
+    session_reason_map = {
+        "Longest Run": "它最能回答這個月的耐力主線有沒有真的站住。",
+        "Highest Load": "它最能代表這個月真正把壓力推到哪裡。",
+        "Fastest Quality": "它最能代表這個月品質刺激是怎麼回來的。",
+        "Lowest HR Easy": "它最能檢查這個月有沒有把恢復保留下來。",
+    }
     for row in key_session_rows or []:
         key = str(row["key_session_type"])
-        if key in seen:
-            continue
-        seen.add(key)
+        group_key = row["activity_id"]
+        if group_key not in grouped_sessions:
+            grouped_sessions[group_key] = {
+                "activity": str(row["activity_name"] or row["activity_type"] or "活動"),
+                "date": format_short_datetime(row["activity_start_time"]),
+                "workout": str(row["workout_type_name_en"] or "未標註"),
+                "distance": format_number(row["distance_km"], 2) or "—",
+                "pace": format_pace_seconds(row["avg_pace_sec_per_km"]) or "—",
+                "hr": "" if row["avg_hr"] is None else int(round(row["avg_hr"])),
+                "load": format_number(row["training_load"], 1) or "—",
+                "shoe": str(row["shoe_display_name"] or "未標註"),
+                "labels": [],
+                "reasons": [],
+            }
+        grouped_sessions[group_key]["labels"].append(session_label_map.get(key, key))
+        reason = session_reason_map.get(key, "它補上了這個月位置真正成立的那個片段。")
+        if reason not in grouped_sessions[group_key]["reasons"]:
+            grouped_sessions[group_key]["reasons"].append(reason)
+
+    key_session_lines = []
+    for session in grouped_sessions.values():
         key_session_lines.append(
-            "- {label}：{activity}；{date}；{workout}；{distance} km；配速 {pace}；HR {hr}；負荷 {load}；鞋款 {shoe}".format(
-                label=session_label_map.get(key, key),
-                activity=str(row["activity_name"] or row["activity_type"] or "活動"),
-                date=format_short_datetime(row["activity_start_time"]),
-                workout=str(row["workout_type_name_en"] or "未標註"),
-                distance=format_number(row["distance_km"], 2) or "—",
-                pace=format_pace_seconds(row["avg_pace_sec_per_km"]) or "—",
-                hr="" if row["avg_hr"] is None else int(round(row["avg_hr"])),
-                load=format_number(row["training_load"], 1) or "—",
-                shoe=str(row["shoe_display_name"] or "未標註"),
+            "- {labels}：{activity}；{date}；{workout}；{distance} km；配速 {pace}；HR {hr}；負荷 {load}；鞋款 {shoe}；Reasons：{reasons}".format(
+                labels=" / ".join(session["labels"]),
+                activity=session["activity"],
+                date=session["date"],
+                workout=session["workout"],
+                distance=session["distance"],
+                pace=session["pace"],
+                hr=session["hr"],
+                load=session["load"],
+                shoe=session["shoe"],
+                reasons=" / ".join(session["reasons"]),
             )
         )
 
@@ -4392,21 +4534,25 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
         "## Monthly Facts",
         f"- 月份：{monthly['month_key']}",
         f"- 狀態：{'進行中' if intelligence['is_partial_month'] else '完整'}",
+        f"- 截至：{monthly['latest_date']}" if monthly["latest_date"] else "- 截至：—",
         f"- 里程：{format_number(monthly['total_km'], 1)} km",
+        f"- 時間：{format_duration_hms(monthly['total_time_sec']) or '—'}",
         f"- 負荷：{format_number(monthly['training_load'], 0) or '—'}",
         f"- 活動數：{monthly['activities'] or 0}",
         f"- 平均配速：{format_pace_seconds(monthly['avg_pace_sec_per_km']) or '—'}",
+        f"- 平均心率：{'' if monthly['avg_hr'] is None else int(round(monthly['avg_hr']))}",
         f"- 相對基準負荷：{format_delta_pct(intelligence['load_delta']) if intelligence['load_delta'] is not None else '基準建立中'}",
         f"- 相對基準里程：{format_delta_pct(intelligence['km_delta']) if intelligence['km_delta'] is not None else '—'}",
         f"- 品質課數：{quality_sessions}",
         f"- 長跑數：{long_runs}",
         "",
-        "## Coach Understanding",
+        "## Coach Position",
         f"- Position：{verdict}",
         f"- Phase：{phase}",
+        f"- Confidence：{confidence}",
         f"- Opening：{letter['opening']}",
+        f"- Learning：{intelligence['coach_summary']}",
         f"- Verdict Reason：{verdict_reason}",
-        f"- Coach Summary：{intelligence['coach_summary']}",
         f"- Next：{letter['looking_forward']}",
     ]
 
@@ -4417,23 +4563,56 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
             f"- Follow-up：{coach_memory['follow_up']}",
         ])
 
+    reasoning_lines = []
+    if intelligence["is_partial_month"]:
+        completion = format_number(progress_pct, 0) if progress_pct is not None else "—"
+        reasoning_lines.append(f"本月目前完成約 {completion}%，先把這次判讀視為進度檢查，不急著下完整月結論。")
+    if coach_memory and coach_memory.get("follow_up"):
+        reasoning_lines.append(f"從上月延續來看：{coach_memory['follow_up']}")
+    load_delta = intelligence["load_delta"]
+    km_delta = intelligence["km_delta"]
+    if load_delta is not None:
+        if load_delta > 15:
+            reasoning_lines.append(f"訓練負荷較前 3 個月平均增加 {format_delta_pct(load_delta)}，目前屬於明顯往前推進的建構。")
+        elif load_delta < -15:
+            reasoning_lines.append(f"訓練負荷較前 3 個月平均下降 {abs(load_delta):.0f}%，更像有意識地吸收與調整。")
+        else:
+            reasoning_lines.append("訓練負荷大致貼近前 3 個月基準，整體節奏仍維持在可延續範圍內。")
+    if km_delta is not None:
+        if km_delta > 10:
+            reasoning_lines.append(f"里程較基準增加 {format_delta_pct(km_delta)}，目前的增加不只來自單次刺激，而是整體累積。")
+        elif km_delta < -10:
+            reasoning_lines.append(f"里程較基準下降 {abs(km_delta):.0f}%，但目前判讀更重視這是否屬於刻意收整。")
+        else:
+            reasoning_lines.append("里程變化不大，代表本月方向主要不是靠單純多跑來改變。")
+    quality_sessions = int(progress_row["current_quality_sessions"] or 0) if progress_row else 0
+    long_runs = int(progress_row["current_long_runs"] or 0) if progress_row else 0
+    if quality_sessions >= 3:
+        reasoning_lines.append(f"本月已有 {quality_sessions} 次品質刺激，代表速度工作已經回到訓練結構裡。")
+    elif quality_sessions >= 1:
+        reasoning_lines.append(f"本月已有 {quality_sessions} 次品質刺激，刺激正在回來，但還沒有壓過整體節奏。")
+    elif long_runs >= 2:
+        reasoning_lines.append(f"本月保留了 {long_runs} 次長跑，耐力主線仍然連續。")
+    elif long_runs == 1:
+        reasoning_lines.append("本月至少保留一次長跑，代表耐力主線沒有完全中斷。")
+
     prompt_lines.extend([
         "",
         "## Reasoning",
-        *[f"- {point}" for point in why_points],
+        *[f"- {point}" for point in reasoning_lines[:4]],
     ])
 
     if week_lines:
         prompt_lines.extend([
             "",
-            "## Attention Weeks",
+            "## Key Weeks Behind This Position",
             *week_lines,
         ])
 
     if key_session_lines:
         prompt_lines.extend([
             "",
-            "## Attention Activities",
+            "## Key Activities Behind This Position",
             *key_session_lines,
         ])
 
@@ -4462,7 +4641,9 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
         "- 先講這個月目前位於什麼訓練位置。",
         "- 再解釋平台為什麼會這樣判讀。",
         "- 最後只留一個下個月提醒。",
-        "- 如果你從 attention weeks、attention activities 或本月訓練結構看見平台尚未明說、但值得注意的變化，可以補充提出。",
+        "- 優先沿著 Coach Position → Reasoning → Key Weeks → Key Activities → Evidence 的順序理解。",
+        "- 目前月份仍在進行中時，避免把目前進度描述成完整月結論。",
+        "- 如果你從 key weeks、key activities 或本月訓練結構看見平台尚未明說、但值得注意的變化，可以補充提出。",
         "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據 evidence 額外補充的觀察。",
         "- 如果 evidence 與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
     ])
@@ -5442,7 +5623,17 @@ def monthly_review_panel(monthly, intelligence, progress_row, assignment_quality
     """
 
 
-def weekly_review_panel(weekly, intelligence, history_rows, distribution_rows, key_session_rows, selected_week="0"):
+def weekly_review_panel(
+    weekly,
+    intelligence,
+    history_rows,
+    distribution_rows,
+    key_session_rows,
+    selected_week="0",
+    history_rows_with_labels=None,
+    monthly_overview=None,
+    overview_attention=None,
+):
     if not weekly or not intelligence:
         return """
         <section class="panel-section">
@@ -5531,7 +5722,7 @@ def weekly_review_panel(weekly, intelligence, history_rows, distribution_rows, k
         <h2>最近 5 週節奏</h2>
         {weekly_history_table(history_rows, selected_week)}
       </section>
-      {weekly_ai_handoff_panel(weekly, intelligence, review, distribution_rows, key_session_rows, history_rows)}
+      {weekly_ai_handoff_panel(weekly, intelligence, review, distribution_rows, key_session_rows, history_rows, history_rows_with_labels, monthly_overview, overview_attention)}
     """
 
 
@@ -8068,6 +8259,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
     weekly = None
     intelligence = None
     weekly_rows = []
+    weekly_rows_with_labels = []
     week_rows = []
     selected_week = ""
     distribution_rows = []
@@ -8124,6 +8316,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
             selected_week = str(weekly["week_offset"]) if weekly else (str(week_rows[0]["week_offset"]) if week_rows else "0")
             intelligence = selected_week_intelligence(connection, selected_week or None)
             weekly_rows = weekly_history(connection)[:5]
+            weekly_rows_with_labels = weekly_history_with_labels(connection, weekly_rows)
             distribution_rows = selected_week_distribution(connection, selected_week or None, limit=6)
             weekly_key_session_rows = selected_week_key_sessions(connection, selected_week or None)
 
@@ -8227,7 +8420,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
     if page == "weekly":
         return f"""{html_start}
     {weekly_selector_bar(week_rows, selected_week, "weekly")}
-    {weekly_review_panel(weekly, intelligence, weekly_rows, distribution_rows, weekly_key_session_rows, selected_week)}
+    {weekly_review_panel(weekly, intelligence, weekly_rows, distribution_rows, weekly_key_session_rows, selected_week, weekly_rows_with_labels, monthly_overview, overview_attention)}
     {archive_metric_strip(summary)}
   </main>
 </body>

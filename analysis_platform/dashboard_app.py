@@ -8930,12 +8930,16 @@ def base_styles():
       margin: 0;
     }
     .ai-reply-rendered p,
-    .ai-reply-rendered ul {
+    .ai-reply-rendered ul,
+    .ai-reply-rendered li {
       margin: 0;
+      font-weight: 400;
+      line-height: 1.6;
     }
     .ai-reply-rendered strong {
       font-size: inherit;
       line-height: inherit;
+      font-weight: 800;
     }
     .ai-reply-rendered ul {
       padding-left: 20px;

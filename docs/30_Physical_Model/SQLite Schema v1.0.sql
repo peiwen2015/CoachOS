@@ -146,6 +146,10 @@ CREATE TABLE IF NOT EXISTS activity (
     garmin_perceived_effort TEXT,
     nutrition TEXT,
     notes TEXT,
+    start_latitude REAL,
+    start_longitude REAL,
+    end_latitude REAL,
+    end_longitude REAL,
 
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

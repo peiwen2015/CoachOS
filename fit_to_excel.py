@@ -684,17 +684,44 @@ def nearest_hour_index(times, target):
 
 
 def activity_location(session, records):
-    lat = semicircles_to_degrees(session.get("start_position_lat") or session.get("end_position_lat"))
-    lon = semicircles_to_degrees(session.get("start_position_long") or session.get("end_position_long"))
+    gps = activity_gps_points(session, records)
+    lat = gps["start_latitude"] if gps["start_latitude"] is not None else gps["end_latitude"]
+    lon = gps["start_longitude"] if gps["start_longitude"] is not None else gps["end_longitude"]
     if lat is not None and lon is not None:
         return lat, lon
-
-    for record in records:
-        lat = semicircles_to_degrees(record.get("position_lat"))
-        lon = semicircles_to_degrees(record.get("position_long"))
-        if lat is not None and lon is not None:
-            return lat, lon
     return None, None
+
+
+def activity_gps_points(session, records):
+    def record_coordinates(record):
+        return (
+            semicircles_to_degrees(record.get("position_lat")),
+            semicircles_to_degrees(record.get("position_long")),
+        )
+
+    start_lat = semicircles_to_degrees(session.get("start_position_lat"))
+    start_lon = semicircles_to_degrees(session.get("start_position_long"))
+    end_lat = semicircles_to_degrees(session.get("end_position_lat"))
+    end_lon = semicircles_to_degrees(session.get("end_position_long"))
+
+    if start_lat is None or start_lon is None:
+        for record in records:
+            start_lat, start_lon = record_coordinates(record)
+            if start_lat is not None and start_lon is not None:
+                break
+
+    if end_lat is None or end_lon is None:
+        for record in reversed(records):
+            end_lat, end_lon = record_coordinates(record)
+            if end_lat is not None and end_lon is not None:
+                break
+
+    return {
+        "start_latitude": start_lat,
+        "start_longitude": start_lon,
+        "end_latitude": end_lat,
+        "end_longitude": end_lon,
+    }
 
 
 def fetch_weather_for_activity(session, records):
@@ -702,7 +729,9 @@ def fetch_weather_for_activity(session, records):
     if start is None:
         return {}
     start_utc = start.astimezone(dt.timezone.utc)
-    latitude, longitude = activity_location(session, records)
+    gps = activity_gps_points(session, records)
+    latitude = gps["start_latitude"] if gps["start_latitude"] is not None else gps["end_latitude"]
+    longitude = gps["start_longitude"] if gps["start_longitude"] is not None else gps["end_longitude"]
     if latitude is None or longitude is None:
         return {}
 
@@ -1325,6 +1354,7 @@ def add_metadata_sheet(wb, metadata, fit_path, session, rows, dropdown_options):
             metadata["training_load"] = round(float(value))
 
     start = fit_datetime(session.get("start_time") or session.get("timestamp"))
+    gps = activity_gps_points(session, rows)
     activity = activity_summary(rows)
     economy = running_economy_summary(rows, session)
     stamina_start, stamina_end = stamina_summary(rows)
@@ -1355,6 +1385,17 @@ def add_metadata_sheet(wb, metadata, fit_path, session, rows, dropdown_options):
                 ("課表類型", metadata.get("workout_type", ""), "workout_type"),
                 ("訓練目的", metadata.get("training_focus", ""), "training_focus"),
                 ("鞋款", metadata.get("shoe", ""), "shoe"),
+            ],
+        ),
+        (
+            "GPS",
+            "4F81BD",
+            "D9EAF7",
+            [
+                ("起點緯度", gps["start_latitude"], "start_latitude"),
+                ("起點經度", gps["start_longitude"], "start_longitude"),
+                ("終點緯度", gps["end_latitude"], "end_latitude"),
+                ("終點經度", gps["end_longitude"], "end_longitude"),
             ],
         ),
         (
@@ -1569,6 +1610,7 @@ def sqlite_activity_row(fit_path, messages, session, rows, metadata):
 
     economy = running_economy_summary(rows, session)
     stamina_start, stamina_end = stamina_summary(rows) if has_stamina_data(messages) else (None, None)
+    gps = activity_gps_points(session, rows)
 
     return {
         "fit_sha256": metadata.get("fit_sha256"),
@@ -1606,6 +1648,10 @@ def sqlite_activity_row(fit_path, messages, session, rows, metadata):
         "garmin_perceived_effort": null_if_blank(metadata.get("rpe")),
         "nutrition": null_if_blank(metadata.get("fueling")),
         "notes": null_if_blank(metadata.get("notes")),
+        "start_latitude": gps["start_latitude"],
+        "start_longitude": gps["start_longitude"],
+        "end_latitude": gps["end_latitude"],
+        "end_longitude": gps["end_longitude"],
     }
 
 
@@ -1670,6 +1716,7 @@ def sqlite_split_rows(messages):
 
 def ensure_sqlite_schema(connection, schema_path=SQLITE_SCHEMA_PATH):
     connection.execute("PRAGMA foreign_keys = ON")
+    ensure_activity_gps_columns(connection)
     for view_name in (
         "activity_view",
         "kilometer_split_view",
@@ -1678,6 +1725,22 @@ def ensure_sqlite_schema(connection, schema_path=SQLITE_SCHEMA_PATH):
     ):
         connection.execute(f"DROP VIEW IF EXISTS {view_name}")
     connection.executescript(schema_path.read_text(encoding="utf-8"))
+
+
+def ensure_activity_gps_columns(connection):
+    table_exists = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'activity'"
+    ).fetchone()
+    if not table_exists:
+        return
+    existing_columns = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(activity)").fetchall()
+    }
+    for column_name in ("start_latitude", "start_longitude", "end_latitude", "end_longitude"):
+        if column_name in existing_columns:
+            continue
+        connection.execute(f"ALTER TABLE activity ADD COLUMN {column_name} REAL")
 
 
 def ensure_dropdown_source_table(connection, dropdown_options):

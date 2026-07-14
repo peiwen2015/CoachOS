@@ -16,10 +16,12 @@ import threading
 import time
 import webbrowser
 from collections import Counter
+from functools import lru_cache
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.request import Request, urlopen
 
 try:
     from semantic_layer import ensure_semantic_layer
@@ -703,6 +705,124 @@ def append_previous_ai_response(prompt_lines, existing_reply):
     )
 
 
+def coach_prompt_reference_lines(surface_label, primary_output, analysis_outline, standard_inputs, rules, extra_notes=None):
+    lines = [
+        "## Prompt Reference",
+        f"- 系統定位：{surface_label} 不是一次性分析 Prompt，而是可長期維護的個人跑步資料分析規格。",
+        f"- 主要輸出：{primary_output}",
+        "- 分析層次：單次訓練＋週期狀態＋長期趨勢",
+        "- 語言：繁體中文",
+        "- 風格：專業、清楚、教練式、避免過度碎片化短句",
+    ]
+    if standard_inputs:
+        lines.extend(["", "### 標準輸入"])
+        lines.extend([f"- {item}" for item in standard_inputs if item])
+    if analysis_outline:
+        lines.extend(["", "### 建議架構"])
+        lines.extend([f"{index}. {item}" for index, item in enumerate(analysis_outline, 1) if item])
+    if rules:
+        lines.extend(["", "### 判讀原則"])
+        lines.extend([f"- {item}" for item in rules if item])
+    if extra_notes:
+        lines.extend(["", "### 補充提醒"])
+        lines.extend([f"- {item}" for item in extra_notes if item])
+    return lines
+
+
+def activity_daily_training_card_prompt(activity, review, weekly_review=None, monthly_overview=None):
+    if not activity or not review:
+        return ""
+
+    def raw_text(value, fallback="—"):
+        if value is None:
+            return fallback
+        text = str(value).strip()
+        return text if text else fallback
+
+    def activity_value(key, fallback=None):
+        try:
+            value = activity[key]
+        except (KeyError, IndexError, TypeError):
+            return fallback
+        return fallback if value is None else value
+
+    activity_date = str(activity["activity_start_time"]).replace("T", " ")[:10].replace("-", "/")
+    activity_name = str(activity["activity_name"] or activity["activity_type"] or "活動")
+    workout_text = str(activity["workout_type_name_en"] or activity["activity_type"] or "未標註")
+    purpose_text = str(activity["primary_training_purpose_name_en"] or "未標註")
+    shoe_text = str(activity["shoe_display_name"] or "未標註")
+    location_text = raw_text(
+        activity_value("location")
+        or activity_value("activity_location")
+        or activity_value("place")
+    )
+    if location_text == "—":
+        location_text = ""
+    if not location_text and activity_value("start_latitude") is not None and activity_value("start_longitude") is not None:
+        location_text = reverse_geocode_location_label_concise(activity_value("start_latitude"), activity_value("start_longitude"))
+    if not location_text and activity_value("end_latitude") is not None and activity_value("end_longitude") is not None:
+        location_text = reverse_geocode_location_label_concise(activity_value("end_latitude"), activity_value("end_longitude"))
+    if not location_text and activity_value("start_latitude") is not None and activity_value("start_longitude") is not None:
+        location_text = f"{format_number(activity_value('start_latitude'), 5)}, {format_number(activity_value('start_longitude'), 5)}"
+    if not location_text:
+        location_text = "未提供"
+    distance_text = f"{format_number(activity['distance_km'], 2)} km"
+    duration_text = format_duration_hms(activity["duration_sec"]) or "—"
+    pace_text = format_pace_seconds(activity["avg_pace_sec_per_km"]) or "—"
+    hr_text = "" if activity["avg_hr"] is None else str(int(round(activity["avg_hr"])))
+    power_value = activity_value("avg_power_w")
+    power_text = "" if power_value is None else format_number(power_value, 0)
+    load_text = format_number(activity["training_load"], 0) or "—"
+    recovery_text = raw_text(activity["recovery_time_hr"])
+
+    prompt_lines = [
+        "請依據今日跑步分析資料產生一張專業風 Facebook 圖卡。",
+        "版型：16:9 橫式，深藍／藍灰科技感背景，Garmin Connect + Runalyze 風格，資訊清楚、專業、乾淨，不要可愛風或漫畫風。",
+        "若地點未提供，請寫「未提供」，不要自行猜測。",
+        "請固定使用以下架構：1. 今日摘要 2. 課表完成度 3. 配速策略 4. 心肺負荷 5. 功率與跑步經濟性 6. Stamina 7. Garmin 指標 8. 教練判斷 9. 下一步建議。",
+        "",
+        "## 今日摘要",
+        f"- 標題：今日跑步分析",
+        f"- 日期：{activity_date}",
+        f"- 地點：{location_text}",
+        f"- 鞋款：{shoe_text}",
+        f"- 課表類型 / 訓練目的：{workout_text} / {purpose_text}",
+        f"- 核心數據：距離 {distance_text}，時間 {duration_text}，平均配速 {pace_text}，平均心率 {hr_text or '—'}，平均功率 {power_text or '—'}，Training Load {load_text}，Recovery Time {recovery_text}",
+        "",
+        "## 今日分析三點",
+        f"- 配速策略：{review.get('learning', '請根據資料分析前後段配速與是否符合目的。')}",
+        f"- 心率控制：{review.get('why', '請根據資料分析心率變化、漂移與環境影響。')}",
+        f"- 跑姿效率：{review.get('looking_forward', '請根據資料分析步頻、步幅、接地時間與垂直振幅。')}",
+        "",
+        "## 教練建議",
+        f"- 恢復或下一堂課建議：{weekly_review.get('looking_forward') if weekly_review and weekly_review.get('looking_forward') else (monthly_overview.get('looking_forward') if monthly_overview and monthly_overview.get('looking_forward') else '請依今天的訓練刺激給出恢復或下一堂課建議。')}",
+        "",
+        "## 底部一句總結",
+        "- 用一句有教練感的結論文字收尾，避免太長。",
+        "",
+        "## 風格要求",
+        "- 繁體中文",
+        "- 精簡、專業",
+        "- 不要塞太多小字",
+        "- 若資料不足，明確標示未提供，不要捏造",
+    ]
+
+    if weekly_review:
+        prompt_lines.extend([
+            "",
+            "## Coach Context",
+            f"- 週回顧脈絡：{weekly_review.get('focus') or '—'}",
+            f"- 週回顧學習：{weekly_review.get('learning') or '—'}",
+        ])
+    if monthly_overview:
+        prompt_lines.extend([
+            f"- 月回顧脈絡：{monthly_overview.get('verdict') or '—'}",
+            f"- 月回顧摘要：{monthly_overview.get('verdict_reason') or '—'}",
+        ])
+
+    return "\n".join(prompt_lines)
+
+
 def format_activity_time(value):
     if value_is_blank(value):
         return ""
@@ -748,10 +868,91 @@ def format_delta_pct(value):
     return f"{sign}{value:.0f}%"
 
 
+def format_location_name_from_address(address, display_name="", concise=False):
+    if not isinstance(address, dict):
+        address = {}
+    if concise:
+        concise_parts = []
+        for key in ("state", "county", "city", "town", "city_district", "district", "suburb"):
+            value = str(address.get(key) or "").strip()
+            if value and value not in concise_parts:
+                concise_parts.append(value)
+        if concise_parts:
+            return " / ".join(concise_parts[:2])
+    parts = []
+    for key in ("state", "county", "city", "town", "suburb", "city_district", "district", "quarter", "neighbourhood", "road", "pedestrian"):
+        value = str(address.get(key) or "").strip()
+        if value and value not in parts:
+            parts.append(value)
+    if parts:
+        return " / ".join(parts[:4])
+    display_name = str(display_name or "").strip()
+    if display_name:
+        return display_name.split(",")[0].strip()
+    return ""
+
+
+@lru_cache(maxsize=512)
+def reverse_geocode_location_label(latitude, longitude):
+    try:
+        lat = round(float(latitude), 5)
+        lon = round(float(longitude), 5)
+    except (TypeError, ValueError):
+        return ""
+    url = (
+        "https://nominatim.openstreetmap.org/reverse?"
+        + urlencode(
+            {
+                "format": "jsonv2",
+                "lat": f"{lat:.5f}",
+                "lon": f"{lon:.5f}",
+                "zoom": "18",
+                "addressdetails": "1",
+                "accept-language": "zh-TW,zh,en",
+            }
+        )
+    )
+    try:
+        with urlopen(Request(url, headers={"User-Agent": "Running Analytics/1.0"}), timeout=8) as response:
+            payload = json.load(response)
+    except Exception:
+        return ""
+    return format_location_name_from_address(payload.get("address") or {}, payload.get("display_name") or "")
+
+
+@lru_cache(maxsize=512)
+def reverse_geocode_location_label_concise(latitude, longitude):
+    try:
+        lat = round(float(latitude), 5)
+        lon = round(float(longitude), 5)
+    except (TypeError, ValueError):
+        return ""
+    url = (
+        "https://nominatim.openstreetmap.org/reverse?"
+        + urlencode(
+            {
+                "format": "jsonv2",
+                "lat": f"{lat:.5f}",
+                "lon": f"{lon:.5f}",
+                "zoom": "16",
+                "addressdetails": "1",
+                "accept-language": "zh-TW,zh,en",
+            }
+        )
+    )
+    try:
+        with urlopen(Request(url, headers={"User-Agent": "Running Analytics/1.0"}), timeout=8) as response:
+            payload = json.load(response)
+    except Exception:
+        return ""
+    return format_location_name_from_address(payload.get("address") or {}, payload.get("display_name") or "", concise=True)
+
+
 def connect():
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
+    ensure_activity_gps_columns(connection)
     ensure_semantic_layer(connection)
     ensure_dropdown_sources(connection)
     ensure_workout_purpose_map(connection)
@@ -1603,6 +1804,22 @@ def clear_activity_metadata_provenance(connection, activity_id, field_name):
         f"DELETE FROM {ACTIVITY_METADATA_PROVENANCE_TABLE} WHERE activity_id = ? AND field_name = ?",
         (activity_id, field_name),
     )
+
+
+def ensure_activity_gps_columns(connection):
+    table_exists = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'activity'"
+    ).fetchone()
+    if not table_exists:
+        return
+    existing_columns = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(activity)").fetchall()
+    }
+    for column_name in ("start_latitude", "start_longitude", "end_latitude", "end_longitude"):
+        if column_name in existing_columns:
+            continue
+        connection.execute(f"ALTER TABLE activity ADD COLUMN {column_name} REAL")
 
 
 def provenance_source_label(source):
@@ -4051,13 +4268,37 @@ def overview_ai_handoff_text(attention, weekly_review, monthly_overview, latest_
         "請根據以下已治理的跑步資料，用繁體中文做進一步分析。",
         "請先回答今天最該先把注意力放在哪裡，再說明為什麼，最後建議我應該先往哪一頁繼續看。",
         "只能根據我提供的內容分析，不要自行發明額外訓練、健康或心理狀態。",
+    ]
+    prompt_lines.extend(
+        coach_prompt_reference_lines(
+            "Overview AI handoff",
+            "今天焦點、下一步入口與跨頁教練脈絡",
+            [
+                "先回答今天最該先把注意力放在哪裡",
+                "再說明為什麼平台會把這個焦點推到前面",
+                "最後建議先往哪一頁繼續看",
+                "如果有額外觀察，請明確區分平台判讀與你補充的觀察",
+            ],
+            [
+                "Today Focus / Why Now / Primary Route / Continue Link",
+                "Weekly Context",
+                "Monthly Context",
+                "Latest Activity",
+            ],
+            [
+                "只能根據提供內容分析，不要自行發明額外訓練、健康或心理狀態。",
+                "如果不同 context 彼此有張力，請指出張力，不要直接覆蓋平台目前的注意力判斷。",
+            ],
+        )
+    )
+    prompt_lines.extend([
         "",
         "## Overview Facts",
         f"- Today Focus：{safe_text(attention.get('title'))}",
         f"- Why Now：{safe_text(attention.get('why'))}",
         f"- Primary Route：{target_label}",
         f"- Continue Link：{safe_text(attention.get('cta'))}",
-    ]
+    ])
 
     if attention.get("secondary_note"):
         prompt_lines.append(f"- Secondary Note：{safe_text(attention.get('secondary_note'))}")
@@ -4536,6 +4777,10 @@ def selected_activity(connection, activity_id):
                 review.avg_gct_ms,
                 review.avg_vertical_oscillation_mm,
                 review.avg_vertical_ratio_pct,
+                review.start_latitude,
+                review.start_longitude,
+                review.end_latitude,
+                review.end_longitude,
                 activity.critical_power_w,
                 review.nutrition,
                 review.notes,
@@ -4595,6 +4840,10 @@ def selected_activity(connection, activity_id):
             review.avg_gct_ms,
             review.avg_vertical_oscillation_mm,
             review.avg_vertical_ratio_pct,
+            review.start_latitude,
+            review.start_longitude,
+            review.end_latitude,
+            review.end_longitude,
             activity.critical_power_w,
             review.nutrition,
             review.notes,
@@ -6020,6 +6269,32 @@ def weekly_ai_handoff_text(
         "請根據以下已治理的跑步資料，用繁體中文做進一步分析。",
         "請先回答這週真正留下來的是什麼，再說明原因，最後只留一個下週提醒。",
         "只能根據我提供的內容分析，不要自行發明額外訓練、健康或心理狀態。",
+    ]
+    prompt_lines.extend(
+        coach_prompt_reference_lines(
+            "Weekly AI handoff",
+            "這週真正留下來的學習、原因與下週提醒",
+            [
+                "先回答這週真正留下來的是什麼",
+                "再說明原因",
+                "最後只留一個下週提醒",
+                "優先沿著 Coach Understanding → Reasoning → Key Activities → Evidence 的順序理解",
+            ],
+            [
+                "週期區間、活動數、里程、負荷、平均心率",
+                "Coach Understanding",
+                "Reasoning",
+                "Key Activities Behind This Learning",
+                "Context",
+                "Evidence",
+            ],
+            [
+                "如果 platform 判讀已經足以支持結論，不要因為 raw evidence 有更多資訊而重建另一套與平台相反的故事。",
+                "若 evidence 與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
+            ],
+        )
+    )
+    prompt_lines.extend([
         "",
         "## Weekly Snapshot",
         f"- 週期：{period_text}",
@@ -6041,7 +6316,7 @@ def weekly_ai_handoff_text(
         "",
         "## Reasoning",
         *cause_lines,
-    ]
+    ])
 
     if knowledge_summary:
         prompt_lines.extend([
@@ -6294,6 +6569,32 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
         "請根據以下已治理的跑步資料，用繁體中文做進一步分析。",
         "請先回答這個月目前位於什麼訓練位置，再說明原因，最後只留一個下個月提醒。",
         "只能根據我提供的內容分析，不要自行發明額外訓練、健康或心理狀態。",
+    ]
+    prompt_lines.extend(
+        coach_prompt_reference_lines(
+            "Monthly AI handoff",
+            "這個月的位置、原因與下個月提醒",
+            [
+                "先回答這個月目前位於什麼訓練位置",
+                "再說明原因",
+                "最後只留一個下個月提醒",
+                "優先看月度位置，再回到關鍵活動與週次脈絡",
+            ],
+            [
+                "月份、狀態、里程、時間、負荷、活動數、平均配速、平均心率",
+                "Coach Position",
+                "Reasoning",
+                "Key Weeks Behind This Position",
+                "Key Activities Behind This Position",
+                "Evidence",
+            ],
+            [
+                "若資料不足，請把月度判讀視為進度檢查，不要硬推完整結論。",
+                "如果 evidence 與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
+            ],
+        )
+    )
+    prompt_lines.extend([
         "",
         "## Monthly Facts",
         f"- 月份：{monthly['month_key']}",
@@ -6318,7 +6619,7 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
         f"- Learning：{intelligence['coach_summary']}",
         f"- Verdict Reason：{verdict_reason}",
         f"- Next：{letter['looking_forward']}",
-    ]
+    ])
 
     if coach_memory:
         prompt_lines.extend([
@@ -6664,6 +6965,23 @@ def activity_facts_panel(activity, split_rows=None):
     if not activity:
         return ""
     split_rows = split_rows or []
+    def activity_value(key, fallback=None):
+        try:
+            value = activity[key]
+        except (KeyError, IndexError, TypeError):
+            return fallback
+        return fallback if value is None else value
+
+    location_name = ""
+    if activity_value("start_latitude") is not None and activity_value("start_longitude") is not None:
+        location_name = reverse_geocode_location_label(activity_value("start_latitude"), activity_value("start_longitude"))
+    if not location_name and activity_value("end_latitude") is not None and activity_value("end_longitude") is not None:
+        location_name = reverse_geocode_location_label(activity_value("end_latitude"), activity_value("end_longitude"))
+    location_display = location_name or (
+        f"{format_number(activity_value('start_latitude'), 5)}, {format_number(activity_value('start_longitude'), 5)}"
+        if activity_value("start_latitude") is not None and activity_value("start_longitude") is not None
+        else "未提供"
+    )
     chips = [
         detail_chip("開始時間", str(activity["activity_start_time"]).replace("T", " ")[:16]),
         detail_chip("距離", f"{format_number(activity['distance_km'], 2)} km"),
@@ -6671,6 +6989,7 @@ def activity_facts_panel(activity, split_rows=None):
         detail_chip("平均配速", format_pace_seconds(activity["avg_pace_sec_per_km"])),
         detail_chip("平均 HR", "" if activity["avg_hr"] is None else int(round(activity["avg_hr"]))),
         detail_chip("負荷", "" if activity["training_load"] is None else format_number(activity["training_load"], 0)),
+        detail_chip("地點", location_display),
         detail_chip("課表", activity["workout_type_name_zh"] or activity["workout_type_name_en"] or activity["activity_type"] or "未標註"),
         detail_chip("鞋款", activity["shoe_display_name"] or "未標註"),
     ]
@@ -7374,6 +7693,32 @@ def activity_ai_handoff_text(activity, review, split_rows, weekly_review=None, m
         "請根據以下已治理的跑步資料，用繁體中文做進一步分析。",
         "請先回答這堂課的整體判讀，再說明原因，最後給一個下一步提醒。",
         "只能根據我提供的內容分析，不要自行發明額外訓練、健康或心理狀態。",
+    ]
+    prompt_lines.extend(
+        coach_prompt_reference_lines(
+            "Activity AI handoff",
+            "這堂課的整體判讀、原因與下一步提醒",
+            [
+                "先回答這堂課真正留下來的是什麼",
+                "再說明為什麼平台會這樣判讀",
+                "最後只留一個下一堂課提醒",
+                "若 raw data 與平台判讀有衝突，先指出衝突",
+            ],
+            [
+                "Activity Facts",
+                "Coach Understanding",
+                "Reasoning",
+                "Attention Segments",
+                "Context",
+                "Evidence",
+            ],
+            [
+                "不要只看配速，必須整合心率、功率、跑姿、Stamina、天氣與課表目的。",
+                "若資料不足，明確說明不足處，不要硬推論。",
+            ],
+        )
+    )
+    prompt_lines.extend([
         "",
         "## Activity Facts",
         f"- 活動：{activity_name}",
@@ -7385,7 +7730,7 @@ def activity_ai_handoff_text(activity, review, split_rows, weekly_review=None, m
         f"- 平均心率：{hr_text}",
         f"- 鞋款：{shoe_text}",
         f"- 主要目的：{purpose_text}",
-    ]
+    ])
     if secondary_purpose_text:
         prompt_lines.append(f"- 次要目的：{secondary_purpose_text}")
 
@@ -7508,10 +7853,12 @@ def activity_ai_handoff_panel(activity, review, split_rows, weekly_review=None, 
         include_raw_data=True,
         saved_reply=saved_reply,
     )
+    daily_card_prompt = activity_daily_training_card_prompt(activity, review, weekly_review, monthly_overview)
     if not handoff_text:
         return ""
 
     escaped_text = html.escape(handoff_text)
+    escaped_daily_card_prompt = html.escape(daily_card_prompt) if daily_card_prompt else ""
     title = f'{format_short_datetime(activity["activity_start_time"])} 單堂課 AI 回覆'
     saved_panel = ai_reply_saved_panel(title, saved_reply, "activity", activity_id=str(activity["activity_id"]))
     capture_panel = ai_reply_capture_panel("activity", str(activity["activity_id"]), title, "activity", saved_reply, activity_id=str(activity["activity_id"]))
@@ -7540,6 +7887,27 @@ def activity_ai_handoff_panel(activity, review, split_rows, weekly_review=None, 
             </details>
           </div>
           <p class="note" id="activity-ai-handoff-status">先看完這堂課，再複製交給你習慣的 AI 繼續分析。</p>
+        </div>
+        <div class="review-card ai-handoff-card">
+          <span>Daily Training Card Prompt</span>
+          <strong>把這堂課交給圖像 AI 做成每日訓練圖卡</strong>
+          <p>這個 prompt 會把今日摘要、課表完成度與教練建議整理成 16:9 的專業圖卡內容。</p>
+          <div class="ai-handoff-block">
+            <div class="ai-handoff-block-head">
+              <div>
+                <strong>圖卡 prompt</strong>
+                <p class="note">可直接交給圖像 AI 生成每日訓練圖卡。</p>
+              </div>
+              <div class="ai-handoff-actions">
+                <button class="secondary-action" type="button" onclick="copyAiHandoff('activity-daily-card-prompt')">複製給 AI</button>
+              </div>
+            </div>
+            <details class="ai-handoff-preview">
+              <summary>先看圖卡 prompt</summary>
+              <textarea id="activity-daily-card-prompt" readonly>{escaped_daily_card_prompt}</textarea>
+            </details>
+          </div>
+          <p class="note">如果你只想做一張每日訓練圖卡，直接複製這段就能用。</p>
         </div>
       </section>
       {capture_panel}

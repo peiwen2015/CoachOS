@@ -276,6 +276,10 @@ Source LDM: `Activity LDM v1.1 Final`
 | garmin_perceived_effort | garmin_perceived_effort | TEXT | NULL | ENUM/check later |
 | nutrition | nutrition | TEXT | NULL | Manual input |
 | notes | notes | TEXT | NULL | Manual input |
+| start_latitude | start_latitude | REAL | NULL | FIT start location latitude |
+| start_longitude | start_longitude | REAL | NULL | FIT start location longitude |
+| end_latitude | end_latitude | REAL | NULL | FIT end location latitude |
+| end_longitude | end_longitude | REAL | NULL | FIT end location longitude |
 | created_at | created_at | TEXT | NOT NULL DEFAULT CURRENT_TIMESTAMP | System timestamp |
 | updated_at | updated_at | TEXT | NOT NULL DEFAULT CURRENT_TIMESTAMP | System timestamp |
 

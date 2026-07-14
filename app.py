@@ -27,11 +27,14 @@ from fit_to_excel import (
     APP_VERSION,
     DEFAULT_OUTPUT_DIR,
     WORKBOOK_VERSION_NAME,
+    activity_gps_points,
     bootstrap_sqlite_state,
+    decode_fit,
     create_workbook,
     default_output_path,
     load_dropdown_options,
     output_month_label,
+    parse_garmin_activity_id,
     weighted_average,
     write_fit_to_sqlite,
 )
@@ -52,6 +55,8 @@ DOWNLOAD_JOBS = {}
 DOWNLOAD_JOBS_LOCK = threading.Lock()
 BATCH_JOBS = {}
 BATCH_JOBS_LOCK = threading.Lock()
+GPS_BACKFILL_JOBS = {}
+GPS_BACKFILL_JOBS_LOCK = threading.Lock()
 ACTIVITY_INFO_FIELDS = [
     ("activity_name", "活動名稱", "text", "活動名稱"),
     ("shoe", "鞋款", "select", "鞋款"),
@@ -580,6 +585,123 @@ def batch_status_table(month):
     """
 
 
+def sqlite_missing_gps_rows(month):
+    bootstrap_sqlite_state(SQLITE_DB_PATH)
+    with sqlite3.connect(SQLITE_DB_PATH) as connection:
+        connection.row_factory = sqlite3.Row
+        rows = connection.execute(
+            """
+            SELECT
+                id,
+                garmin_activity_id,
+                source_file_name,
+                activity_start_time,
+                activity_name,
+                activity_type,
+                start_latitude,
+                start_longitude,
+                end_latitude,
+                end_longitude
+            FROM activity
+            WHERE substr(activity_start_time, 1, 7) = ?
+              AND (
+                start_latitude IS NULL
+                OR start_longitude IS NULL
+                OR end_latitude IS NULL
+                OR end_longitude IS NULL
+              )
+            ORDER BY activity_start_time DESC
+            """,
+            (month,),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def fit_index_for_month(month):
+    fits = fit_files_for_month(month)
+    by_activity_id = {}
+    by_name = {}
+    for fit_path in fits:
+        activity_id = parse_garmin_activity_id(fit_path)
+        if activity_id and activity_id not in by_activity_id:
+            by_activity_id[activity_id] = fit_path
+        by_name[fit_path.name] = fit_path
+    return {"all": fits, "by_activity_id": by_activity_id, "by_name": by_name}
+
+
+def match_fit_for_gps_row(row, fit_index):
+    activity_id = row.get("garmin_activity_id")
+    if activity_id:
+        fit_path = fit_index["by_activity_id"].get(int(activity_id))
+        if fit_path:
+            return fit_path, "activity_id"
+    source_file_name = str(row.get("source_file_name") or "").strip()
+    if source_file_name:
+        fit_path = fit_index["by_name"].get(source_file_name)
+        if fit_path:
+            return fit_path, "source_file_name"
+    return None, "missing"
+
+
+def gps_backfill_scan(month):
+    rows = sqlite_missing_gps_rows(month)
+    fit_index = fit_index_for_month(month)
+    scanned = []
+    for row in rows:
+        fit_path, matched_by = match_fit_for_gps_row(row, fit_index)
+        scanned.append(
+            {
+                **row,
+                "fit_path": fit_path,
+                "fit": relative_fit_path(fit_path) if fit_path else "",
+                "match_source": matched_by,
+                "status": "可補寫" if fit_path else "缺 FIT",
+            }
+        )
+    return scanned
+
+
+def gps_backfill_status_table(month):
+    rows = gps_backfill_scan(month)
+    if not rows:
+        return '<p class="note">這個月份在 SQLite 裡沒有缺 GPS 的活動。</p>'
+    html_rows = []
+    for row in rows:
+        activity_label = str(row["activity_name"] or row["activity_type"] or "活動")
+        start_time = str(row["activity_start_time"]).replace("T", " ")[:16]
+        fit_name = row["fit"] or "找不到對應 FIT"
+        match_label = "Garmin ID" if row["match_source"] == "activity_id" else ("原始檔名" if row["match_source"] == "source_file_name" else "需重新下載")
+        html_rows.append(
+            f"""
+            <tr>
+              <td>{html.escape(start_time)}</td>
+              <td>{html.escape(activity_label)}</td>
+              <td>{html.escape(row["status"])}</td>
+              <td><code>{html.escape(fit_name)}</code></td>
+              <td>{html.escape(match_label)}</td>
+            </tr>
+            """
+        )
+    return f"""
+      <div class="reference-table-wrap">
+        <table class="reference-table">
+          <thead>
+            <tr>
+              <th>活動時間</th>
+              <th>活動</th>
+              <th>GPS</th>
+              <th>FIT</th>
+              <th>對應方式</th>
+            </tr>
+          </thead>
+          <tbody>
+            {"".join(html_rows)}
+          </tbody>
+        </table>
+      </div>
+    """
+
+
 def update_download_job(job_id, **updates):
     with DOWNLOAD_JOBS_LOCK:
         job = DOWNLOAD_JOBS.get(job_id)
@@ -707,6 +829,14 @@ def update_batch_job(job_id, **updates):
         job.update(updates)
 
 
+def update_gps_backfill_job(job_id, **updates):
+    with GPS_BACKFILL_JOBS_LOCK:
+        job = GPS_BACKFILL_JOBS.get(job_id)
+        if not job:
+            return
+        job.update(updates)
+
+
 def should_batch_convert(row, overwrite_newer=False, overwrite_all=False):
     if overwrite_all:
         return True
@@ -761,6 +891,57 @@ def batch_convert_result_html(job, job_id=""):
     return "".join(parts)
 
 
+def gps_backfill_result_html(job, job_id=""):
+    result = job.get("result") or {}
+    month = html.escape(job.get("month", ""))
+    success = result.get("success", [])
+    missing = result.get("missing", [])
+    failed = result.get("failed", [])
+    parts = [
+        f"{month} GPS 補寫完成：成功 {len(success)} 筆，缺 FIT {len(missing)} 筆，失敗 {len(failed)} 筆。<br>",
+        f"SQLite：<code>{html.escape(str(SQLITE_DB_PATH))}</code><br>",
+    ]
+    if success:
+        parts.append("<br>已補回 GPS 的活動：<br>")
+        for item in success[:20]:
+            parts.append(
+                f"{html.escape(item['activity_start_time'])} · "
+                f"{html.escape(item['activity_name'])} · "
+                f"<code>{html.escape(item['fit'])}</code><br>"
+            )
+        if len(success) > 20:
+            parts.append(f"...另有 {len(success) - 20} 筆成功補寫<br>")
+    if missing:
+        parts.append("<br>缺 FIT，需要重新下載：<br>")
+        for item in missing[:20]:
+            parts.append(
+                f"{html.escape(item['activity_start_time'])} · "
+                f"{html.escape(item['activity_name'])}"
+            )
+            if item.get("garmin_activity_id"):
+                parts.append(f" · Garmin ID <code>{html.escape(str(item['garmin_activity_id']))}</code>")
+            parts.append("<br>")
+        if len(missing) > 20:
+            parts.append(f"...另有 {len(missing) - 20} 筆缺 FIT<br>")
+    if failed:
+        parts.append("<br>補寫失敗：<br>")
+        for item in failed[:12]:
+            parts.append(
+                f"{html.escape(item['activity_start_time'])} · "
+                f"{html.escape(item['activity_name'])} · "
+                f"{html.escape(item['error'])}<br>"
+            )
+        if len(failed) > 12:
+            parts.append(f"...另有 {len(failed) - 12} 筆失敗<br>")
+    result_link = "/gps-backfill-result?" + urlencode({"job": job_id}) if job_id else ""
+    parts.append(
+        "<br>"
+        + (f'<a class="button" href="{html.escape(result_link, quote=True)}">回這次 GPS 補寫清單</a> ' if result_link else "")
+        + f'<a class="button secondary" href="/batch-convert?month={html.escape(job.get("month", ""), quote=True)}">回批次轉檔</a>'
+    )
+    return "".join(parts)
+
+
 def render_batch_result_page(job_id):
     with BATCH_JOBS_LOCK:
         job = dict(BATCH_JOBS.get(job_id) or {})
@@ -790,6 +971,35 @@ def render_batch_result_page(job_id):
 </html>"""
 
 
+def render_gps_backfill_result_page(job_id):
+    with GPS_BACKFILL_JOBS_LOCK:
+        job = dict(GPS_BACKFILL_JOBS.get(job_id) or {})
+    if not job:
+        return render_batch_convert_page(error="找不到這次 GPS 補寫清單，可能是程式已重新啟動。")
+    if job.get("status") != "done":
+        return render_gps_backfill_progress_page(job_id)
+    return f"""<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPS 補寫結果</title>
+  <style>
+    {base_styles()}
+  </style>
+</head>
+<body>
+  <main>
+    {product_banner("GPS 補寫結果")}
+    {nav("batch")}
+    <section class="status ok">
+      {gps_backfill_result_html(job, job_id)}
+    </section>
+  </main>
+</body>
+</html>"""
+
+
 def batch_job_snapshot(job_id):
     with BATCH_JOBS_LOCK:
         job = dict(BATCH_JOBS.get(job_id) or {})
@@ -811,6 +1021,130 @@ def batch_job_snapshot(job_id):
     if snapshot["status"] == "done":
         snapshot["result_html"] = batch_convert_result_html(job, job_id)
     return snapshot
+
+
+def gps_backfill_job_snapshot(job_id):
+    with GPS_BACKFILL_JOBS_LOCK:
+        job = dict(GPS_BACKFILL_JOBS.get(job_id) or {})
+    if not job:
+        return {"found": False}
+    current = int(job.get("current", 0) or 0)
+    total = int(job.get("total", 0) or 0)
+    percent = round(current / total * 100) if total else 0
+    snapshot = {
+        "found": True,
+        "status": job.get("status", "running"),
+        "message": job.get("message", ""),
+        "current": current,
+        "total": total,
+        "percent": percent,
+        "error": job.get("error", ""),
+        "result_html": "",
+    }
+    if snapshot["status"] == "done":
+        snapshot["result_html"] = gps_backfill_result_html(job, job_id)
+    return snapshot
+
+
+def backfill_activity_gps_from_fit(connection, activity_id, fit_path):
+    messages = decode_fit(fit_path)
+    session_messages = messages.get("session_mesgs", []) if messages else []
+    session = session_messages[0] if session_messages else {}
+    gps = activity_gps_points(session, messages.get("record_mesgs", []))
+    connection.execute(
+        """
+        UPDATE activity
+        SET
+            start_latitude = ?,
+            start_longitude = ?,
+            end_latitude = ?,
+            end_longitude = ?,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (
+            gps["start_latitude"],
+            gps["start_longitude"],
+            gps["end_latitude"],
+            gps["end_longitude"],
+            activity_id,
+        ),
+    )
+    return gps
+
+
+def run_gps_backfill_job(job_id, month):
+    rows = gps_backfill_scan(month)
+    result = {"success": [], "missing": [], "failed": []}
+    total = len(rows)
+    update_gps_backfill_job(job_id, total=total, current=0, message=f"找到 {total} 筆需要檢查的活動。")
+
+    with sqlite3.connect(SQLITE_DB_PATH) as connection:
+        for index, row in enumerate(rows, start=1):
+            activity_name = str(row["activity_name"] or row["activity_type"] or "活動")
+            activity_time = str(row["activity_start_time"]).replace("T", " ")[:16]
+            if not row["fit_path"]:
+                result["missing"].append(
+                    {
+                        "activity_id": row["id"],
+                        "activity_name": activity_name,
+                        "activity_start_time": activity_time,
+                        "garmin_activity_id": row.get("garmin_activity_id"),
+                    }
+                )
+                update_gps_backfill_job(job_id, current=index, message=f"缺 FIT：{activity_name}")
+                continue
+            update_gps_backfill_job(job_id, current=index - 1, message=f"補寫 GPS：{activity_name}")
+            try:
+                backfill_activity_gps_from_fit(connection, row["id"], row["fit_path"])
+                result["success"].append(
+                    {
+                        "activity_id": row["id"],
+                        "activity_name": activity_name,
+                        "activity_start_time": activity_time,
+                        "fit": relative_fit_path(row["fit_path"]),
+                    }
+                )
+                update_gps_backfill_job(job_id, current=index, message=f"已補寫：{activity_name}")
+            except Exception as error:
+                result["failed"].append(
+                    {
+                        "activity_id": row["id"],
+                        "activity_name": activity_name,
+                        "activity_start_time": activity_time,
+                        "error": friendly_error(error),
+                    }
+                )
+                update_gps_backfill_job(job_id, current=index, message=f"補寫失敗：{activity_name}")
+        connection.commit()
+
+    update_gps_backfill_job(
+        job_id,
+        status="done",
+        current=total,
+        total=total,
+        result=result,
+        message="GPS 補寫完成。",
+    )
+
+
+def start_gps_backfill_job(month):
+    job_id = uuid.uuid4().hex
+    with GPS_BACKFILL_JOBS_LOCK:
+        GPS_BACKFILL_JOBS[job_id] = {
+            "status": "running",
+            "message": "準備補寫 GPS...",
+            "current": 0,
+            "total": 0,
+            "month": month,
+        }
+    worker = threading.Thread(
+        target=run_gps_backfill_job,
+        args=(job_id, month),
+        daemon=True,
+    )
+    worker.start()
+    return job_id
 
 
 def run_batch_convert_job(job_id, month, metadata, fetch_weather, overwrite_newer, overwrite_all):
@@ -1981,6 +2315,9 @@ def render_batch_convert_page(message="", error="", selected_month=""):
     months = available_fit_months()
     selected_month = selected_month or (months[0] if months else dt.date.today().strftime("%Y-%m"))
     options = load_app_options()
+    gps_rows = gps_backfill_scan(selected_month)
+    gps_fillable = len([row for row in gps_rows if row["fit_path"]])
+    gps_missing = len([row for row in gps_rows if not row["fit_path"]])
     return f"""<!doctype html>
 <html lang="zh-Hant">
 <head>
@@ -2032,6 +2369,31 @@ def render_batch_convert_page(message="", error="", selected_month=""):
       <div class="actions">
         <button type="submit">轉換未完成項目</button>
         <a class="button secondary" href="/batch-convert">重新掃描</a>
+      </div>
+    </form>
+    <form method="post" action="/gps-backfill">
+      <input type="hidden" name="month" value="{html.escape(selected_month, quote=True)}">
+      <fieldset>
+        <legend>補 GPS 到 SQLite</legend>
+        <p class="note">這裡只補 SQLite 缺掉的 GPS，不會重轉 Excel。系統會先用 Garmin Activity ID，其次用原始檔名去找對應 FIT；找不到時就提醒你重新下載。</p>
+        <div class="grid">
+          <label>
+            <span>月份</span>
+            <input type="text" value="{html.escape(selected_month)}" readonly>
+          </label>
+          <label>
+            <span>可直接補寫</span>
+            <input type="text" value="{gps_fillable} 筆" readonly>
+          </label>
+          <label>
+            <span>缺 FIT</span>
+            <input type="text" value="{gps_missing} 筆" readonly>
+          </label>
+        </div>
+        {gps_backfill_status_table(selected_month)}
+      </fieldset>
+      <div class="actions">
+        <button type="submit">補 SQLite GPS</button>
       </div>
     </form>
   </main>
@@ -2088,6 +2450,71 @@ def render_batch_progress_page(job_id):
         return;
       }}
       message.textContent = data.error || data.message || "轉檔中...";
+      fill.style.width = `${{data.percent || 0}}%`;
+      count.textContent = `${{data.current || 0}} / ${{data.total || 0}}`;
+      percent.textContent = `${{data.percent || 0}}%`;
+      if (data.status === "done") {{
+        fill.style.width = "100%";
+        percent.textContent = "100%";
+        result.innerHTML = data.result_html || "";
+        return;
+      }}
+      if (data.status === "error") {{
+        result.innerHTML = '<a class="button secondary" href="/batch-convert">重新開始</a>';
+        return;
+      }}
+      window.setTimeout(refreshProgress, 1000);
+    }}
+    refreshProgress();
+  </script>
+</body>
+</html>"""
+
+
+def render_gps_backfill_progress_page(job_id):
+    return f"""<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CoachOS - GPS 補寫進度</title>
+  <style>
+    {base_styles()}
+  </style>
+</head>
+<body>
+  <main>
+    {product_banner("GPS 補寫")}
+    {nav("batch")}
+    <section class="progress-card">
+      <p id="progress-message" class="progress-message">準備補寫 GPS...</p>
+      <div class="progress-bar" aria-label="GPS 補寫進度">
+        <div id="progress-fill" class="progress-fill"></div>
+      </div>
+      <div class="progress-meta">
+        <span id="progress-count">0 / 0</span>
+        <span id="progress-percent">0%</span>
+      </div>
+      <div id="progress-result" class="progress-result"></div>
+    </section>
+  </main>
+  <script>
+    const jobId = "{html.escape(job_id, quote=True)}";
+    async function refreshProgress() {{
+      const response = await fetch(`/gps-backfill-status?job=${{encodeURIComponent(jobId)}}`, {{cache: "no-store"}});
+      const data = await response.json();
+      const message = document.getElementById("progress-message");
+      const fill = document.getElementById("progress-fill");
+      const count = document.getElementById("progress-count");
+      const percent = document.getElementById("progress-percent");
+      const result = document.getElementById("progress-result");
+
+      if (!data.found) {{
+        message.textContent = "找不到 GPS 補寫工作，請重新開始。";
+        result.innerHTML = '<a class="button secondary" href="/batch-convert">回批次轉檔</a>';
+        return;
+      }}
+      message.textContent = data.error || data.message || "補寫中...";
       fill.style.width = `${{data.percent || 0}}%`;
       count.textContent = `${{data.current || 0}} / ${{data.total || 0}}`;
       percent.textContent = `${{data.percent || 0}}%`;
@@ -2235,8 +2662,14 @@ class AppHandler(BaseHTTPRequestHandler):
         if parsed.path == "/batch-convert-status":
             self.send_json(batch_job_snapshot(first_value(query, "job")))
             return
+        if parsed.path == "/gps-backfill-status":
+            self.send_json(gps_backfill_job_snapshot(first_value(query, "job")))
+            return
         if parsed.path == "/batch-result":
             self.send_html(render_batch_result_page(first_value(query, "job")))
+            return
+        if parsed.path == "/gps-backfill-result":
+            self.send_html(render_gps_backfill_result_page(first_value(query, "job")))
             return
         if parsed.path == "/edit-excel":
             self.send_html(render_edit_excel_page(Path(first_value(query, "path")), job_id=first_value(query, "job")))
@@ -2316,6 +2749,22 @@ class AppHandler(BaseHTTPRequestHandler):
             overwrite_all = first_value(form, "overwrite_all") == "1"
             job_id = start_batch_convert_job(month, metadata, fetch_weather, overwrite_newer, overwrite_all)
             self.send_html(render_batch_progress_page(job_id))
+            return
+
+        if parsed.path == "/gps-backfill":
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length)
+            form, _files = parse_post_data(self.headers, body)
+            month = first_value(form, "month")
+            if not re.fullmatch(r"\d{4}-\d{2}", month or ""):
+                self.send_html(render_batch_convert_page(error="請選擇有效月份。"), status=400)
+                return
+            gps_rows = gps_backfill_scan(month)
+            if not gps_rows:
+                self.send_html(render_batch_convert_page(message="這個月份目前沒有缺 GPS 的活動。", selected_month=month))
+                return
+            job_id = start_gps_backfill_job(month)
+            self.send_html(render_gps_backfill_progress_page(job_id))
             return
 
         if parsed.path == "/download-fit":

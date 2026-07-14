@@ -530,8 +530,9 @@ def render_ai_reply_attachments(surface, identifier, page="", activity_id="", we
               </a>
               <figcaption>
                 <span>{html.escape(item['updated_at'].replace('T', ' '))}</span>
-                <form method="post" action="/ai-replies/delete-image" class="ai-attachment-delete-form">
+                <form method="post" action="/ai-replies/delete-image" class="ai-attachment-delete-form remember-scroll-form">
                   {"".join(f'<input type="hidden" name="{html.escape(name, quote=True)}" value="{html.escape(value, quote=True)}">' for name, value in hidden_fields if value)}
+                  <input type="hidden" name="scroll_y" value="">
                   <button class="secondary-action ai-attachment-delete-button" type="submit">刪除這張</button>
                 </form>
               </figcaption>
@@ -4081,7 +4082,7 @@ def ai_reply_capture_panel(surface, identifier, title, return_page, existing_rep
           <span>AI Conversation Loop</span>
           <strong>把你跟 AI 往下聊出的結果存回這一頁</strong>
           <p>{lead}</p>
-          <form method="post" action="/ai-replies/save" class="ai-reply-form">
+          <form method="post" action="/ai-replies/save" class="ai-reply-form remember-scroll-form">
             <input type="hidden" name="surface" value="{html.escape(surface, quote=True)}">
             <input type="hidden" name="identifier" value="{html.escape(identifier, quote=True)}">
             <input type="hidden" name="title" value="{html.escape(title, quote=True)}">
@@ -4089,6 +4090,7 @@ def ai_reply_capture_panel(surface, identifier, title, return_page, existing_rep
             <input type="hidden" name="activity_id" value="{html.escape(str(activity_id), quote=True)}">
             <input type="hidden" name="week" value="{html.escape(str(week), quote=True)}">
             <input type="hidden" name="month" value="{html.escape(str(month), quote=True)}">
+            <input type="hidden" name="scroll_y" value="">
             <label class="inline-field">
               <span>貼上 AI 回覆</span>
               <textarea name="ai_reply_raw" data-ai-reply-input="1" placeholder="把 AI 回覆整段貼進來。平台會先解析出實際要保存的內容。">{html.escape(raw_markdown)}</textarea>
@@ -4102,7 +4104,7 @@ def ai_reply_capture_panel(surface, identifier, title, return_page, existing_rep
               <button class="primary-action" type="submit">儲存 AI 回覆</button>
             </div>
           </form>
-          <form method="post" action="/ai-replies/upload-image" enctype="multipart/form-data" class="ai-reply-image-form">
+          <form method="post" action="/ai-replies/upload-image" enctype="multipart/form-data" class="ai-reply-image-form remember-scroll-form">
             <input type="hidden" name="surface" value="{html.escape(surface, quote=True)}">
             <input type="hidden" name="identifier" value="{html.escape(identifier, quote=True)}">
             <input type="hidden" name="title" value="{html.escape(title, quote=True)}">
@@ -4110,6 +4112,7 @@ def ai_reply_capture_panel(surface, identifier, title, return_page, existing_rep
             <input type="hidden" name="activity_id" value="{html.escape(str(activity_id), quote=True)}">
             <input type="hidden" name="week" value="{html.escape(str(week), quote=True)}">
             <input type="hidden" name="month" value="{html.escape(str(month), quote=True)}">
+            <input type="hidden" name="scroll_y" value="">
             <label class="inline-field">
               <span>附加圖檔</span>
               <input type="file" name="ai_reply_image" accept="image/*">
@@ -8722,8 +8725,9 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_c
               <td>{html.escape(display_name)}</td>
               <td>{html.escape(str(row["category"] or ""))}</td>
               <td>
-                <form method="post" action="/shoes/save-status" class="inline-status-form">
+                <form method="post" action="/shoes/save-status" class="inline-status-form remember-scroll-form">
                   <input type="hidden" name="shoe_id" value="{row["id"]}">
+                  <input type="hidden" name="scroll_y" value="">
                   <label class="inline-field">
                     <span>狀態</span>
                     <select name="is_active">
@@ -8786,7 +8790,8 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_c
               <p>{html.escape(add_shoe_help)}</p>
             </div>
             {empty_note_html}
-            <form method="post" action="/shoes/add" class="metadata-form">
+            <form method="post" action="/shoes/add" class="metadata-form remember-scroll-form">
+              <input type="hidden" name="scroll_y" value="">
               <label>
                 <span>鞋款名稱</span>
                 <input type="text" name="shoe_name" placeholder="例如：Adidas Boston 13" required>
@@ -12945,6 +12950,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             activity_id = first_form_value(form, "activity_id", "").strip()
             week = first_form_value(form, "week", "").strip()
             month = first_form_value(form, "month", "").strip()
+            scroll_y = first_form_value(form, "scroll_y", "").strip()
             raw_text = first_form_value(form, "ai_reply_raw", "")
 
             if not surface or not identifier or not raw_text.strip():
@@ -12960,6 +12966,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 params["week"] = week
             if month:
                 params["month"] = month
+            if scroll_y:
+                params["scroll_y"] = scroll_y
             self.redirect("/?" + urlencode(params))
             return
 
@@ -12972,6 +12980,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             activity_id = first_form_value(form, "activity_id", "").strip()
             week = first_form_value(form, "week", "").strip()
             month = first_form_value(form, "month", "").strip()
+            scroll_y = first_form_value(form, "scroll_y", "").strip()
             uploaded = form.get("ai_reply_image")
             uploaded_file = None
             if isinstance(uploaded, list) and uploaded:
@@ -12995,6 +13004,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 params["week"] = week
             if month:
                 params["month"] = month
+            if scroll_y:
+                params["scroll_y"] = scroll_y
             self.redirect("/?" + urlencode(params))
             return
 
@@ -13007,6 +13018,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             activity_id = first_form_value(form, "activity_id", "").strip()
             week = first_form_value(form, "week", "").strip()
             month = first_form_value(form, "month", "").strip()
+            scroll_y = first_form_value(form, "scroll_y", "").strip()
 
             if not surface or not identifier or not filename:
                 message = "找不到要刪除的圖檔。"
@@ -13026,11 +13038,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 params["week"] = week
             if month:
                 params["month"] = month
+            if scroll_y:
+                params["scroll_y"] = scroll_y
             self.redirect("/?" + urlencode(params))
             return
 
         if parsed.path == "/shoes/add":
             form = parse_qs(body.decode("utf-8"))
+            scroll_y = first_form_value(form, "scroll_y", "").strip()
             try:
                 with connect() as connection:
                     shoe_name = append_shoe_option(first_form_value(form, "shoe_name"), connection)
@@ -13041,12 +13056,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 message = str(exc)
             except Exception:
                 message = "新增鞋款時出了點問題，請再試一次。"
-            location = "/?" + urlencode(
-                {
-                    "page": "shoes",
-                    "message": message,
-                }
-            )
+            params = {"page": "shoes", "message": message}
+            if scroll_y:
+                params["scroll_y"] = scroll_y
+            location = "/?" + urlencode(params)
             self.redirect(location)
             return
 
@@ -13055,6 +13068,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             shoe_id = int(first_form_value(form, "shoe_id", "0") or "0")
             is_active = 1 if first_form_value(form, "is_active", "1") == "1" else 0
             retire_date = first_form_value(form, "retire_date", "").strip() or None
+            scroll_y = first_form_value(form, "scroll_y", "").strip()
 
             with connect() as connection:
                 connection.execute(
@@ -13070,12 +13084,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 )
                 connection.commit()
 
-            location = "/?" + urlencode(
-                {
-                    "page": "shoes",
-                    "message": "鞋款狀態已儲存",
-                }
-            )
+            params = {"page": "shoes", "message": "鞋款狀態已儲存"}
+            if scroll_y:
+                params["scroll_y"] = scroll_y
+            location = "/?" + urlencode(params)
             self.redirect(location)
             return
 

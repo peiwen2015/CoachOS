@@ -787,7 +787,7 @@ def activity_daily_training_card_prompt(
         location_text = f"{format_number(activity_value('start_latitude'), 5)}, {format_number(activity_value('start_longitude'), 5)}"
     if not location_text:
         location_text = "未提供"
-    distance_text = f"{format_number(activity['distance_km'], 2)} km"
+    activity_distance_text = f"{format_number(activity['distance_km'], 2)} km"
     duration_text = format_duration_hms(activity["duration_sec"]) or "—"
     pace_text = format_pace_seconds(activity["avg_pace_sec_per_km"]) or "—"
     hr_text = "" if activity["avg_hr"] is None else str(int(round(activity["avg_hr"])))
@@ -802,9 +802,9 @@ def activity_daily_training_card_prompt(
             f"- {row['label']}（{row['section']}）：{row['metric']}；{row['note']}"
         )
     workout_structure_lines = []
-    for row in (workout_split_rows or [])[:8]:
-        segment_type = workout_split_label(row)
-        distance_text = (
+    for row in display_workout_splits(workout_split_rows or []):
+        segment_type = workout_display_label(row, workout_split_rows or [])
+        workout_distance_text = (
             f"{format_number((row['total_distance_m'] or 0) / 1000, 2)} km"
             if (row["total_distance_m"] or 0) >= 1000
             else f"{format_number(row['total_distance_m'], 0)} m"
@@ -813,7 +813,7 @@ def activity_daily_training_card_prompt(
         pace_value = None if row["avg_speed_mps"] in (None, 0) else 1000.0 / float(row["avg_speed_mps"])
         pace_label = format_pace_seconds(pace_value) or "—"
         workout_structure_lines.append(
-            f"- 片段 {row['split_index']}：{segment_type}，{distance_text}，{time_text}，配速 {pace_label}"
+            f"- 片段 {row['split_index']}：{segment_type}，{workout_distance_text}，{time_text}，配速 {pace_label}"
         )
     has_previous_ai_reply = bool(saved_reply and saved_reply.get("responseMarkdown"))
 
@@ -838,7 +838,7 @@ def activity_daily_training_card_prompt(
         f"- 地點：{location_text}",
         f"- 鞋款：{shoe_text}",
         f"- 課表類型 / 訓練目的：{workout_text} / {purpose_text}",
-        f"- 核心數據：距離 {distance_text}，時間 {duration_text}，平均配速 {pace_text}，平均心率 {hr_text or '—'}，平均功率 {power_text or '—'}，Training Load {load_text}，Recovery Time {recovery_text}",
+        f"- 核心數據：距離 {activity_distance_text}，時間 {duration_text}，平均配速 {pace_text}，平均心率 {hr_text or '—'}，平均功率 {power_text or '—'}，Training Load {load_text}，Recovery Time {recovery_text}",
         "",
         "## 平台已整理的教練判讀",
         f"- 這堂課先回答的問題：{review.get('learning_question', '—')}",
@@ -3569,6 +3569,12 @@ def activity_review_payload(activity, split_rows, workout_split_rows=None):
         load_label = f"負荷 {format_number(training_load, 0)}"
         if distance >= 16:
             load_note = "這堂課本身已經足夠形成耐力或品質壓力。"
+        elif easy_run and (
+            training_load >= 120
+            or (activity["training_effect_aerobic"] is not None and float(activity["training_effect_aerobic"]) >= 3.0)
+            or (stamina_drop is not None and stamina_drop >= 20)
+        ):
+            load_note = "這不是高強度品質課，但仍留下了可辨識的有氧刺激。"
         elif training_load >= 250:
             load_note = "這堂課本身的刺激不低，重點是之後怎麼承接。"
         else:
@@ -5564,7 +5570,10 @@ def summarize_workout_structure_rows(workout_rows):
         parts.append(f"WU {format_number(warmup_distance / 1000, 2)} km")
     if main_distances:
         if len(main_distances) == 1:
-            parts.append(f"主段 {format_number(main_distances[0] / 1000, 2)} km")
+            if not stride_count and recovery_count == 0 and warmup_distance == 0 and cooldown_distance == 0:
+                parts.append(f"連續跑步 {format_number(main_distances[0] / 1000, 2)} km")
+            else:
+                parts.append(f"主段 {format_number(main_distances[0] / 1000, 2)} km")
         else:
             main_km = " / ".join(format_number(distance / 1000, 2) for distance in main_distances[:4])
             suffix = " ..." if len(main_distances) > 4 else ""
@@ -5617,8 +5626,12 @@ def workout_structure_pattern_insights(summary_rows, period_label="本週"):
     has_stride = any("Stride" in row["summary"] for row in summary_rows)
     interval_rows = [row for row in summary_rows if "主段 " in row["summary"] and "組（" in row["summary"]]
     long_main_rows = []
+    continuous_rows = []
     for row in summary_rows:
         summary = row["summary"]
+        if "連續跑步 " in summary:
+            continuous_rows.append(row)
+            continue
         if "主段 " in summary and "組（" not in summary and "Stride" not in summary:
             long_main_rows.append(row)
 
@@ -5627,6 +5640,9 @@ def workout_structure_pattern_insights(summary_rows, period_label="本週"):
         lines.append(f"{period_label}的品質刺激不是單點出現，而是用明確主段組合反覆建立，像 {workouts} 這樣的課表型態很清楚。")
     if has_stride:
         lines.append(f"{period_label}不只是在累積主體里程，還有課尾短加速把動作節奏重新接回來。")
+    if continuous_rows:
+        workouts = "、".join(row["workout"] for row in continuous_rows[:2])
+        lines.append(f"{period_label}也保留了連續跑完的主體課，像 {workouts} 這類課表更像是在穩穩維持整體節奏。")
     if long_main_rows:
         workouts = "、".join(row["workout"] for row in long_main_rows[:2])
         lines.append(f"{period_label}也保留了較長的連續主體，像 {workouts} 這類課表更像是在維持整體節奏與耐力主線。")
@@ -8501,11 +8517,30 @@ def workout_split_label(row):
     return row["split_type"] or f"片段 {row['split_index']}"
 
 
+def workout_display_label(row, workout_split_rows=None):
+    label = workout_split_label(row)
+    distance_m = float(row["total_distance_m"] or 0)
+    duration_sec = float(row["total_timer_time_sec"] or 0)
+    if workout_segment_kind(row) == "active" and distance_m < 300 and duration_sec <= 30:
+        return "Stride"
+    rows = display_workout_splits(workout_split_rows or [])
+    if len(rows) == 1 and workout_segment_kind(row) == "active":
+        return "連續跑步"
+    return label
+
+
 def display_workout_splits(workout_split_rows):
     rows = []
     for row in workout_split_rows or []:
         split_type = str(row["split_type"] or "").strip().lower()
-        if split_type in {"rwd_run", "rwd_walk", ""}:
+        distance_m = row["total_distance_m"]
+        duration_sec = row["total_timer_time_sec"]
+        speed_mps = row["avg_speed_mps"]
+        if split_type in {"rwd_run", "rwd_walk", "rwd_stand", ""}:
+            continue
+        # Drop zero-length / zero-time placeholder rows that sometimes appear
+        # in treadmill FIT workout messages.
+        if (distance_m in (None, 0, 0.0)) and (duration_sec in (None, 0, 0.0)) and speed_mps in (None, 0, 0.0):
             continue
         rows.append(row)
     return rows
@@ -8603,6 +8638,9 @@ def structured_focus_splits(split_rows, workout_split_rows):
     if selected_main:
         selected = selected_main
     if len(focus_segments) == 1 and len(selected) >= 6:
+        last_distance = float(selected[-1]["split_distance_m"] or 0)
+        if 980 <= last_distance <= 1020:
+            return selected[1:]
         return selected[1:-1]
     return selected
 
@@ -8629,7 +8667,7 @@ def structured_segment_label_for_split(row, split_rows, workout_split_rows):
     segment = structured_segment_for_split(row, split_rows, workout_split_rows)
     if not segment:
         return activity_split_label(row, split_rows)
-    segment_label = workout_split_label(segment)
+    segment_label = workout_display_label(segment, workout_split_rows)
     raw_label = activity_split_label(row, split_rows)
     if raw_label.startswith("片段 ") or raw_label.startswith("KM "):
         return f"{segment_label} · {raw_label}"
@@ -8654,7 +8692,7 @@ def activity_workout_structure_table(workout_split_rows):
             f"""
             <tr>
               <td>{index}</td>
-              <td>{html.escape(str(workout_split_label(row)))}</td>
+              <td>{html.escape(str(workout_display_label(row, workout_split_rows)))}</td>
               <td>{html.escape(distance_text)}</td>
               <td>{html.escape(format_duration_hms(row["total_timer_time_sec"]))}</td>
               <td>{html.escape(pace_text)}</td>
@@ -13958,13 +13996,25 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
+    def handle_one_request(self):
+        try:
+            super().handle_one_request()
+        except (BrokenPipeError, ConnectionResetError, TimeoutError, OSError):
+            return
+
+    def safe_write(self, data):
+        try:
+            self.wfile.write(data)
+        except (BrokenPipeError, ConnectionResetError, TimeoutError, OSError):
+            return
+
     def send_html(self, content, status=200):
         data = content.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
-        self.wfile.write(data)
+        self.safe_write(data)
 
     def send_asset(self, path):
         try:
@@ -13982,7 +14032,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
-        self.wfile.write(data)
+        self.safe_write(data)
 
     def redirect(self, location):
         self.send_response(303)
@@ -14015,7 +14065,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
-            self.wfile.write(data)
+            self.safe_write(data)
             return
         if parsed.path == "/open-rac":
             if ensure_rac_running():

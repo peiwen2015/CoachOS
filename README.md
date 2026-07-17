@@ -6,7 +6,7 @@
 
 ## Release Status
 
-- `v1.3.4` 已正式發布
+- `v1.3.5` 已正式發布
 - 產品對外主名稱維持 `CoachOS`
 - 核心資料鏈路已固定為 `FIT -> Excel -> SQLite -> Semantic Layer -> Dashboard`
 - `Connected Coach Knowledge` 已接進 `Activity -> Weekly -> Monthly -> AI handoff`
@@ -186,7 +186,7 @@ docs/      架構與產品文件
 
 ## 對外發布方向
 
-這個 repo 現在反映的是正式對外的 `v1.3.4` 狀態，主題仍是 `Connected Coach Knowledge`：
+這個 repo 現在反映的是正式對外的 `v1.3.5` 狀態，主題仍是 `Connected Coach Knowledge`：
 
 - 統一名稱：`CoachOS`
 - 把資料匯入工具作為產品裡的資料入口，而不是獨立散落的小工具
@@ -194,7 +194,7 @@ docs/      架構與產品文件
 - 讓 `Activity` 裡確認的知識，實際回流到 `Weekly / Monthly / AI handoff`
 - 讓 `課表結構`、`GPS`、`每日 / 每週 / 每月圖卡 prompt` 成為日常使用的一部分
 
-`v1.3.4` 之後的下一步，不再只是把資料接進來，而是繼續收斂：
+`v1.3.5` 之後的下一步，不再只是把資料接進來，而是繼續收斂：
 
 - 課表結構驅動的 Activity 判讀口徑
 - 更穩定的本機 daily use flow
@@ -207,6 +207,8 @@ docs/      架構與產品文件
 [`RELEASE_NOTES_v1.2.0.md`](/Users/perryliu/Documents/Running%20Analytics/RELEASE_NOTES_v1.2.0.md)
 
 [`RELEASE_NOTES_v1.3.0.md`](/Users/perryliu/Documents/Running%20Analytics/RELEASE_NOTES_v1.3.0.md)
+
+[`RELEASE_NOTES_v1.3.5.md`](/Users/perryliu/Documents/Running%20Analytics/RELEASE_NOTES_v1.3.5.md)
 
 [`docs/00_Governance/CoachOS Product Roadmap v1.0 Draft.md`](/Users/perryliu/Documents/Running%20Analytics/docs/00_Governance/CoachOS%20Product%20Roadmap%20v1.0%20Draft.md)
 

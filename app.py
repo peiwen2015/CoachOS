@@ -40,6 +40,7 @@ from fit_to_excel import (
     weighted_average,
     write_fit_to_sqlite,
 )
+from repair_hr_artifacts import backfill_sqlite_activity_max_hr, repair_excel_workbooks
 
 
 ROOT = Path(__file__).resolve().parent
@@ -75,12 +76,12 @@ ACTIVITY_INFO_FIELDS = [
     ("rpe", "感受難度", "select", "感受難度"),
     ("fueling", "補給紀錄", "textarea", "補給紀錄"),
     ("notes", "備註", "textarea", "備註"),
-    ("max_hr", "最大心率", "number", "最大心率"),
-    ("critical_power", "Critical Power (W)", "number", "Critical Power(W)"),
-    ("training_effect_aerobic", "Training Effect (Aerobic)", "number", "Training Effect (Aerobic)"),
-    ("training_effect_anaerobic", "Training Effect (Anaerobic)", "number", "Training Effect (Anaerobic)"),
-    ("training_load", "Training Load", "number", "Training Load"),
-    ("recovery_time_hr", "Recovery Time (hr)", "number", "Recovery Time (hr)"),
+    ("max_hr", "個人最大心率", "number", "個人最大心率"),
+    ("critical_power", "個人臨界功率", "number", "個人臨界功率"),
+    ("training_effect_aerobic", "有氧訓練效果", "number", "有氧訓練效果"),
+    ("training_effect_anaerobic", "無氧訓練效果", "number", "無氧訓練效果"),
+    ("training_load", "訓練負荷", "number", "訓練負荷"),
+    ("recovery_time_hr", "恢復時間（小時）", "number", "恢復時間（小時）"),
 ]
 WORKOUT_FOCUS_MAP_KEY = "workout_focus_map"
 
@@ -214,8 +215,8 @@ def workbook_summary(path):
         ("平均功率", f"{weighted_average(avg_power_pairs, 1)} W" if avg_power_pairs else ""),
         ("課表結構", workbook_workout_structure_label(wb)),
         ("天氣", weather_summary(info)),
-        ("Training Effect", training_effect_summary(info)),
-        ("Training Load", info.get("Training Load")),
+        ("訓練效果", training_effect_summary(info)),
+        ("訓練負荷", info.get("訓練負荷", info.get("Training Load"))),
     ]
     return [(label, value) for label, value in summary if value not in ("", None)]
 
@@ -304,13 +305,13 @@ def weather_summary(info):
 
 
 def training_effect_summary(info):
-    aerobic = info.get("Training Effect (Aerobic)")
-    anaerobic = info.get("Training Effect (Anaerobic)")
+    aerobic = info.get("有氧訓練效果", info.get("Training Effect (Aerobic)"))
+    anaerobic = info.get("無氧訓練效果", info.get("Training Effect (Anaerobic)"))
     parts = []
     if aerobic not in ("", None):
-        parts.append(f"Aerobic {aerobic}")
+        parts.append(f"有氧 {aerobic}")
     if anaerobic not in ("", None):
-        parts.append(f"Anaerobic {anaerobic}")
+        parts.append(f"無氧 {anaerobic}")
     return " / ".join(parts)
 
 
@@ -1028,6 +1029,30 @@ def batch_convert_result_html(job, job_id=""):
     return "".join(parts)
 
 
+def hr_repair_result_html(job, job_id=""):
+    result = job.get("result") or {}
+    month = html.escape(job.get("month", ""))
+    sqlite_updates = int(result.get("sqlite_updates", 0) or 0)
+    excel_scanned = int(result.get("excel_scanned", 0) or 0)
+    excel_updated = int(result.get("excel_updated", 0) or 0)
+    output_dir = DEFAULT_OUTPUT_DIR / job.get("month", "")
+    parts = [
+        f"{month} 心率與臨界功率修補完成。<br>",
+        f"SQLite 更新：<code>{sqlite_updates}</code> 筆<br>",
+        f"Excel 更新：<code>{excel_updated}</code> / <code>{excel_scanned}</code> 份<br>",
+        f"月份資料夾：<code>{html.escape(str(output_dir))}</code><br>",
+    ]
+    folder_link = "/open-folder?" + urlencode({"path": str(output_dir)})
+    result_link = "/batch-result?" + urlencode({"job": job_id}) if job_id else ""
+    parts.append(
+        "<br>"
+        f'<a class="button" href="{html.escape(folder_link, quote=True)}">開啟月份 EXCEL 資料夾</a> '
+        + (f'<a class="button secondary" href="{html.escape(result_link, quote=True)}">回這次修補清單</a> ' if result_link else "")
+        + f'<a class="button secondary" href="/batch-convert?month={html.escape(job.get("month", ""), quote=True)}">回批次轉檔</a>'
+    )
+    return "".join(parts)
+
+
 def gps_backfill_result_html(job, job_id=""):
     result = job.get("result") or {}
     month = html.escape(job.get("month", ""))
@@ -1101,7 +1126,7 @@ def workout_structure_backfill_result_html(job, job_id=""):
         if len(success) > 20:
             parts.append(f"...另有 {len(success) - 20} 筆成功補寫<br>")
     if empty:
-        parts.append("<br>FIT 已檢查，但沒有 structured workout：<br>")
+        parts.append("<br>FIT 已檢查，但沒有結構化課表：<br>")
         for item in empty[:20]:
             parts.append(
                 f"{html.escape(item['activity_start_time'])} · "
@@ -1246,7 +1271,10 @@ def batch_job_snapshot(job_id):
         "result_html": "",
     }
     if snapshot["status"] == "done":
-        snapshot["result_html"] = batch_convert_result_html(job, job_id)
+        if job.get("job_type") == "hr_repair":
+            snapshot["result_html"] = hr_repair_result_html(job, job_id)
+        else:
+            snapshot["result_html"] = batch_convert_result_html(job, job_id)
     return snapshot
 
 
@@ -1428,7 +1456,7 @@ def run_workout_structure_backfill_job(job_id, month):
                 synced = backfill_activity_workout_structure_from_fit(connection, row["id"], row["fit_path"])
                 summary = synced.get("structure") or {}
                 if summary.get("has_workout_structure"):
-                    label = summary.get("workout_name") or f"{synced.get('step_count', 0)} steps / {synced.get('split_count', 0)} splits"
+                    label = summary.get("workout_name") or f"{synced.get('step_count', 0)} 步驟 / {synced.get('split_count', 0)} 分段"
                     result["success"].append(
                         {
                             "activity_id": row["id"],
@@ -1566,6 +1594,25 @@ def run_safe_refresh_job(job_id, month, fetch_weather):
     )
 
 
+def run_hr_repair_job(job_id, month):
+    update_batch_job(job_id, total=2, current=0, message=f"正在修補 {month} 的 SQLite 活動最高心率...")
+    sqlite_updates = backfill_sqlite_activity_max_hr(SQLITE_DB_PATH, month)
+    update_batch_job(job_id, current=1, message=f"正在修補 {month} 的 Excel 標籤與活動最高心率...")
+    excel_scanned, excel_updated = repair_excel_workbooks(DEFAULT_OUTPUT_DIR, SQLITE_DB_PATH, month)
+    update_batch_job(
+        job_id,
+        status="done",
+        current=2,
+        total=2,
+        result={
+            "sqlite_updates": sqlite_updates,
+            "excel_scanned": excel_scanned,
+            "excel_updated": excel_updated,
+        },
+        message="修補完成。",
+    )
+
+
 def start_batch_convert_job(month, metadata, fetch_weather, overwrite_newer, overwrite_all):
     job_id = uuid.uuid4().hex
     with BATCH_JOBS_LOCK:
@@ -1600,6 +1647,27 @@ def start_safe_refresh_job(month, fetch_weather):
     worker = threading.Thread(
         target=run_safe_refresh_job,
         args=(job_id, month, fetch_weather),
+        daemon=True,
+    )
+    worker.start()
+    return job_id
+
+
+def start_hr_repair_job(month):
+    job_id = uuid.uuid4().hex
+    with BATCH_JOBS_LOCK:
+        BATCH_JOBS[job_id] = {
+            "status": "running",
+            "message": "準備修補既有 Excel / SQLite...",
+            "current": 0,
+            "total": 0,
+            "month": month,
+            "edited": [],
+            "job_type": "hr_repair",
+        }
+    worker = threading.Thread(
+        target=run_hr_repair_job,
+        args=(job_id, month),
         daemon=True,
     )
     worker.start()
@@ -2453,15 +2521,15 @@ def render_page(message="", error="", selected_fit=""):
             <span>感受難度</span>
             <select name="rpe">{option_tags(dropdown_options["garmin_rpe"])}</select>
           </label>
-          {input_field("最大心率", "max_hr", input_type="number", placeholder="自動")}
-          {input_field("Critical Power(W)", "critical_power", input_type="number", placeholder="自動")}
+          {input_field("個人最大心率", "max_hr", input_type="number", placeholder="自動")}
+          {input_field("個人臨界功率", "critical_power", input_type="number", placeholder="自動")}
           {input_field("氣溫(°C)", "weather_temp", input_type="number", placeholder="自動")}
           {input_field("濕度(%)", "humidity", input_type="number", placeholder="自動")}
           {input_field("風向", "wind_direction", placeholder="自動")}
           {input_field("風速", "wind_speed", placeholder="自動")}
           {input_field("天氣描述", "weather_description", placeholder="自動")}
-          {input_field("Recovery Time (hr)", "recovery_time_hr", input_type="number")}
-          {input_field("Training Load", "training_load", input_type="number", placeholder="自動")}
+          {input_field("恢復時間（小時）", "recovery_time_hr", input_type="number")}
+          {input_field("訓練負荷", "training_load", input_type="number", placeholder="自動")}
           <label class="wide">
             <span>補給紀錄</span>
             <textarea name="fueling"></textarea>
@@ -2750,8 +2818,8 @@ def render_batch_convert_page(message="", error="", selected_month=""):
             <span>鞋款</span>
             <select name="shoe">{option_tags(options["shoes"])}</select>
           </label>
-          {input_field("最大心率", "max_hr", input_type="number", placeholder="自動")}
-          {input_field("Critical Power(W)", "critical_power", input_type="number", placeholder="自動")}
+          {input_field("個人最大心率", "max_hr", input_type="number", placeholder="自動")}
+          {input_field("個人臨界功率", "critical_power", input_type="number", placeholder="自動")}
           <label class="inline wide">
             <input type="checkbox" name="fetch_weather" value="1" checked>
             <span>自動抓 Open-Meteo 歷史天氣</span>
@@ -2786,6 +2854,16 @@ def render_batch_convert_page(message="", error="", selected_month=""):
         <button type="submit">整月安全重轉</button>
       </div>
     </form>
+    <form method="post" action="/repair-hr-artifacts">
+      <input type="hidden" name="month" value="{html.escape(selected_month, quote=True)}">
+      <fieldset>
+        <legend>修補既有 Excel / SQLite</legend>
+        <p class="note">這裡會修正既有資料中的心率與訓練指標標籤：SQLite 會把活動最高心率回補成真實活動值，Excel 會把「最大心率」改成「個人最大心率」、補上「活動最高心率」、把 Critical Power 改成「個人臨界功率」，並把訓練效果、訓練負荷、恢復時間與體力欄位統一成中文。</p>
+      </fieldset>
+      <div class="actions">
+        <button type="submit">修補這個月的既有資料</button>
+      </div>
+    </form>
     <form method="post" action="/gps-backfill">
       <input type="hidden" name="month" value="{html.escape(selected_month, quote=True)}">
       <fieldset>
@@ -2815,7 +2893,7 @@ def render_batch_convert_page(message="", error="", selected_month=""):
       <input type="hidden" name="month" value="{html.escape(selected_month, quote=True)}">
       <fieldset>
         <legend>補課表結構到 SQLite</legend>
-        <p class="note">這裡會從 FIT 補回 structured workout 資訊到 SQLite，包括 workout、workout steps 與 split types。系統會先用 Garmin Activity ID，其次用原始檔名去找對應 FIT；找不到時就提醒你重新下載。若 FIT 本身沒有 structured workout，也會記成「已檢查」。</p>
+        <p class="note">這裡會從 FIT 補回結構化課表資訊到 SQLite，包括課表、課表步驟與分段類型。系統會先用 Garmin Activity ID，其次用原始檔名去找對應 FIT；找不到時就提醒你重新下載。若 FIT 本身沒有結構化課表，也會記成「已檢查」。</p>
         <div class="grid">
           <label>
             <span>月份</span>
@@ -3275,6 +3353,21 @@ class AppHandler(BaseHTTPRequestHandler):
                 return
             fetch_weather = first_value(form, "fetch_weather") == "1"
             job_id = start_safe_refresh_job(month, fetch_weather)
+            self.send_html(render_batch_progress_page(job_id))
+            return
+
+        if parsed.path == "/repair-hr-artifacts":
+            length = int(self.headers.get("Content-Length", "0"))
+            body = self.rfile.read(length)
+            form, _files = parse_post_data(self.headers, body)
+            month = first_value(form, "month")
+            if not re.fullmatch(r"\d{4}-\d{2}", month or ""):
+                self.send_html(render_batch_convert_page(error="請選擇有效月份。"), status=400)
+                return
+            if not fit_files_for_month(month):
+                self.send_html(render_batch_convert_page(error="這個月份沒有 FIT 檔。", selected_month=month), status=400)
+                return
+            job_id = start_hr_repair_job(month)
             self.send_html(render_batch_progress_page(job_id))
             return
 

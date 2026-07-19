@@ -21,7 +21,7 @@ from openpyxl.utils import get_column_letter
 
 
 FIT_EPOCH = 631065600
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.3.6"
 WORKBOOK_VERSION_NAME = "跑步分析資料 v1.1"
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "EXCEL"
 CONFIG_DIR = Path(__file__).resolve().parent / "config"
@@ -137,8 +137,8 @@ HEADERS = [
     "觸地時間(ms)",
     "步幅(mm)",
     "溫度(°C)",
-    "Stamina 起",
-    "Stamina 末",
+    "體力起",
+    "體力末",
     "爬升(m)",
 ]
 
@@ -1035,17 +1035,17 @@ def collect_metadata(args, dropdown_options):
     if not metadata["fueling"]:
         metadata["fueling"] = prompt_text("補給紀錄")
     if metadata["max_hr"] == "":
-        metadata["max_hr"] = prompt_text("最大心率")
+        metadata["max_hr"] = prompt_text("個人最大心率")
     if metadata["critical_power"] == "":
-        metadata["critical_power"] = prompt_text("Critical Power(W)")
+        metadata["critical_power"] = prompt_text("個人臨界功率")
     if metadata["training_effect_aerobic"] == "":
-        metadata["training_effect_aerobic"] = prompt_text("Training Effect (Aerobic)")
+        metadata["training_effect_aerobic"] = prompt_text("有氧訓練效果")
     if metadata["training_effect_anaerobic"] == "":
-        metadata["training_effect_anaerobic"] = prompt_text("Training Effect (Anaerobic)")
+        metadata["training_effect_anaerobic"] = prompt_text("無氧訓練效果")
     if metadata["training_load"] == "":
-        metadata["training_load"] = prompt_text("Training Load")
+        metadata["training_load"] = prompt_text("訓練負荷")
     if metadata["recovery_time_hr"] == "":
-        metadata["recovery_time_hr"] = prompt_text("Recovery Time (hr)")
+        metadata["recovery_time_hr"] = prompt_text("恢復時間（小時）")
     if not metadata["notes"]:
         metadata["notes"] = prompt_text("備註")
     return metadata
@@ -1390,6 +1390,10 @@ def add_metadata_sheet(wb, metadata, fit_path, session, rows, records, dropdown_
     activity = activity_summary(rows)
     economy = running_economy_summary(rows, session)
     stamina_start, stamina_end = stamina_summary(rows)
+    activity_max_hr = int_or_none(first_number(session, "max_heart_rate"))
+    if activity_max_hr is None:
+        lap_max_values = [row[6] for row in rows if isinstance(row[6], (int, float))]
+        activity_max_hr = int_or_none(max(lap_max_values) if lap_max_values else None)
     metadata_sections = [
         (
             "Metadata",
@@ -1458,14 +1462,15 @@ def add_metadata_sheet(wb, metadata, fit_path, session, rows, records, dropdown_
             "7030A0",
             "EADCF8",
             [
-                ("最大心率", metadata.get("max_hr", ""), "max_hr"),
-                ("Critical Power (W)", metadata.get("critical_power", ""), "critical_power"),
-                ("Training Effect (Aerobic)", metadata.get("training_effect_aerobic", ""), "training_effect_aerobic"),
-                ("Training Effect (Anaerobic)", metadata.get("training_effect_anaerobic", ""), "training_effect_anaerobic"),
-                ("Training Load", metadata.get("training_load", ""), "training_load"),
-                ("Recovery Time (hr)", metadata.get("recovery_time_hr", ""), "recovery_time_hr"),
-                ("Stamina 起始 (%)", stamina_start, "stamina_start"),
-                ("Stamina 結束 (%)", stamina_end, "stamina_end"),
+                ("個人最大心率", metadata.get("max_hr", ""), "max_hr"),
+                ("活動最高心率", activity_max_hr, "activity_max_hr"),
+                ("個人臨界功率", metadata.get("critical_power", ""), "critical_power"),
+                ("有氧訓練效果", metadata.get("training_effect_aerobic", ""), "training_effect_aerobic"),
+                ("無氧訓練效果", metadata.get("training_effect_anaerobic", ""), "training_effect_anaerobic"),
+                ("訓練負荷", metadata.get("training_load", ""), "training_load"),
+                ("恢復時間（小時）", metadata.get("recovery_time_hr", ""), "recovery_time_hr"),
+                ("體力起始 (%)", stamina_start, "stamina_start"),
+                ("體力結束 (%)", stamina_end, "stamina_end"),
             ],
         ),
         (
@@ -1584,8 +1589,8 @@ def add_workout_structure_sheet(wb, messages):
         ("課表名稱", structure["workout_name"] or ""),
         ("課表描述", structure["workout_description"] or ""),
         ("有效步驟數", structure["num_valid_steps"] if structure["num_valid_steps"] is not None else ""),
-        ("Workout Steps", len(step_rows)),
-        ("Workout Splits", len(split_rows)),
+        ("課表步驟數", len(step_rows)),
+        ("課表分段數", len(split_rows)),
     ]
 
     thin_gray = Side(style="thin", color="D9E2F3")
@@ -1604,15 +1609,15 @@ def add_workout_structure_sheet(wb, messages):
     row_no += 1
     step_header_row = row_no
     step_headers = [
-        "Step",
-        "Intensity",
-        "Duration Type",
-        "Distance (m)",
-        "Time (sec)",
-        "Target Type",
-        "Target Low",
-        "Target High",
-        "Repeat Steps",
+        "步驟",
+        "強度",
+        "時間類型",
+        "距離 (m)",
+        "時間 (sec)",
+        "目標類型",
+        "目標下限",
+        "目標上限",
+        "重複步驟",
     ]
     for col, title in enumerate(step_headers, start=1):
         cell = ws.cell(step_header_row, col, title)
@@ -1638,14 +1643,14 @@ def add_workout_structure_sheet(wb, messages):
     row_no = step_header_row + max(len(step_rows), 1) + 3
     split_header_row = row_no
     split_headers = [
-        "Split",
-        "Split Type",
-        "Num Splits",
-        "Distance (m)",
-        "Timer Time (sec)",
-        "Avg Speed (m/s)",
-        "Sport",
-        "Sub Sport",
+        "分段",
+        "分段類型",
+        "分段數",
+        "距離 (m)",
+        "計時時間 (sec)",
+        "平均速度 (m/s)",
+        "運動",
+        "子類型",
     ]
     for col, title in enumerate(split_headers, start=1):
         cell = ws.cell(split_header_row, col, title)
@@ -1721,15 +1726,15 @@ def add_total_row(ws, row_count, rows):
 def add_charts(wb, row_count):
     ws = wb["每公里數據"]
     chart_ws = wb.create_sheet("圖表")
-    chart_ws["A1"] = "配速 / 心率 / Stamina 趨勢圖"
+    chart_ws["A1"] = "配速 / 心率 / 體力趨勢圖"
     chart_ws["A1"].font = Font(name="Arial", size=14, bold=True)
 
     max_row = row_count + 2
     cats = Reference(ws, min_col=1, min_row=3, max_row=max_row)
 
     chart1 = LineChart()
-    chart1.title = "心率與 Stamina 隨公里數變化"
-    chart1.y_axis.title = "心率 / Stamina"
+    chart1.title = "心率與體力隨公里數變化"
+    chart1.y_axis.title = "心率 / 體力"
     chart1.x_axis.title = "公里"
     for col in (5, 16, 17):
         data = Reference(ws, min_col=col, min_row=2, max_row=max_row)
@@ -1762,6 +1767,10 @@ def sqlite_activity_row(fit_path, messages, session, rows, metadata):
     economy = running_economy_summary(rows, session)
     stamina_start, stamina_end = stamina_summary(rows) if has_stamina_data(messages) else (None, None)
     gps = activity_gps_points(session, messages.get("record_mesgs", []))
+    activity_max_hr = int_or_none(first_number(session, "max_heart_rate"))
+    if activity_max_hr is None:
+        lap_max_values = [row[6] for row in rows if isinstance(row[6], (int, float))]
+        activity_max_hr = int_or_none(max(lap_max_values) if lap_max_values else None)
 
     return {
         "fit_sha256": metadata.get("fit_sha256"),
@@ -1781,7 +1790,7 @@ def sqlite_activity_row(fit_path, messages, session, rows, metadata):
         "wind_speed_mps": wind_speed_mps(metadata.get("wind_speed")),
         "wind_direction_deg": wind_direction_degrees(metadata.get("wind_direction")),
         "weather_description": null_if_blank(metadata.get("weather_description")),
-        "max_hr": int_or_none(metadata.get("max_hr") or first_number(session, "max_heart_rate")),
+        "max_hr": activity_max_hr,
         "avg_hr": int_or_none(first_number(session, "avg_heart_rate") or weighted_average(((row[4], row[2]) for row in rows), 1)),
         "critical_power_w": int_or_none(metadata.get("critical_power")),
         "training_effect_aerobic": float_or_none(metadata.get("training_effect_aerobic")),
@@ -2506,7 +2515,7 @@ def main():
     parser.add_argument("--feel", help="Workout feel, e.g. 50 or '普通'.")
     parser.add_argument("--rpe", help="Effort rating, e.g. 3, 30, or '3 - 中等'.")
     parser.add_argument("--fueling", help="Free-form fueling notes.")
-    parser.add_argument("--max-hr", type=float, help="Maximum heart rate used for average heart rate percentage.")
+    parser.add_argument("--max-hr", type=float, help="Personal maximum heart rate used for average heart rate percentage.")
     parser.add_argument("--critical-power", type=float, help="Critical Power in watts used for average power percentage.")
     parser.add_argument("--training-effect-aerobic", type=float, help="Aerobic Training Effect summary.")
     parser.add_argument("--training-effect-anaerobic", type=float, help="Anaerobic Training Effect summary.")

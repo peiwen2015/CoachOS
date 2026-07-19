@@ -685,7 +685,7 @@ def parse_multipart_form_data(body, content_type):
 
 def ai_handoff_response_format_instructions():
     return [
-        "## Response Format",
+        "## 回覆格式",
         "- 你的回覆必須包含兩個連續部分。",
         "- 第一部分：直接用一般 markdown 正常回答，不要加入「第一部分」、「閱讀版」或其他格式說明。",
         "- 第二部分：在閱讀內容結束後，再輸出一份完全相同、可貼回平台保存的 markdown。",
@@ -698,7 +698,7 @@ def ai_handoff_response_format_instructions():
         "- `## 判讀衝突`",
         "- `## 下一步提醒`",
         "- 若沒有額外觀察，請寫「沒有需要額外補充的明顯訊號」。",
-        "- 若沒有衝突，請寫「未發現 raw data 與平台判讀之間有明顯衝突」。",
+        "- 若沒有衝突，請寫「未發現原始資料與平台判讀之間有明顯衝突」。",
         "- 下一步提醒只能提供一個。",
     ]
 
@@ -709,9 +709,9 @@ def append_previous_ai_response(prompt_lines, existing_reply):
     prompt_lines.extend(
         [
             "",
-            "## Previous AI Response",
+            "## 先前的 AI 回覆",
             "以下內容是使用者先前保存的 AI 延伸分析。",
-            "它只能作為討論脈絡，不是平台治理事實，也不能用來覆蓋 Activity Facts、Coach Understanding、Reasoning、Attention Segments、Context 或 Evidence。",
+            "它只能作為討論脈絡，不是平台治理事實，也不能用來覆蓋活動事實、教練理解、推理、關鍵片段、上下文或證據。",
             "如果舊回覆中的內容無法由本次平台資料支持，請把它視為先前推測，不要延續為既定事實。",
             existing_reply["responseMarkdown"],
         ]
@@ -823,12 +823,12 @@ def activity_daily_training_card_prompt(
         "請不要畫成可愛風、漫畫風，也不要加入未提供的跑者故事、心情、身體狀態或訓練背景。",
         "若資料不足，請明確寫「未提供」或保守處理，不要自行猜測。",
         "請把內容整理成真正適合放進圖卡的文案與區塊，不要只是把欄位逐條重貼。",
-        "請固定使用以下圖卡架構：1. 今日摘要 2. 課表完成度 3. 配速策略 4. 心肺負荷 5. 功率與跑步經濟性 6. Stamina 7. Garmin 指標 8. 教練判斷 9. 下一步建議。",
+        "請固定使用以下圖卡架構：1. 今日摘要 2. 課表完成度 3. 配速策略 4. 心肺負荷 5. 功率與跑步經濟性 6. 體力 7. Garmin 指標 8. 教練判斷 9. 下一步建議。",
         "",
         "## 產出要求",
         "- 每個區塊請用可上卡的短文案呈現，不要寫成長篇報告。",
         "- 整體語氣要像專業跑步教練，不要像資料庫或系統說明。",
-        "- 若課表片段表存在，請先用它理解主體課程，再用 raw split 補證據。",
+        "- 若課表片段表存在，請先用它理解主體課程，再用原始分段補證據。",
         "- 不要把 warm-up、recovery、stride、cool-down 誤寫成今天的主體刺激。",
         "- 最後請補一行適合放在卡片底部的收尾句。",
         "",
@@ -838,14 +838,14 @@ def activity_daily_training_card_prompt(
         f"- 地點：{location_text}",
         f"- 鞋款：{shoe_text}",
         f"- 課表類型 / 訓練目的：{workout_text} / {purpose_text}",
-        f"- 核心數據：距離 {activity_distance_text}，時間 {duration_text}，平均配速 {pace_text}，平均心率 {hr_text or '—'}，平均功率 {power_text or '—'}，Training Load {load_text}，Recovery Time {recovery_text}",
+        f"- 核心數據：距離 {activity_distance_text}，時間 {duration_text}，平均配速 {pace_text}，平均心率 {hr_text or '—'}，平均功率 {power_text or '—'}，訓練負荷 {load_text}，恢復時間 {recovery_text}",
         "",
         "## 平台已整理的教練判讀",
         f"- 這堂課先回答的問題：{review.get('learning_question', '—')}",
-        f"- Learning：{review.get('learning', '請根據資料分析前後段配速與是否符合目的。')}",
-        f"- Focus：{review.get('focus', '請整理這堂課真正留下來的是什麼。')}",
-        f"- Why：{review.get('why', '請根據資料分析心率變化、漂移與環境影響。')}",
-        f"- Next：{review.get('looking_forward', '請根據資料分析步頻、步幅、接地時間與垂直振幅。')}",
+        f"- 學習：{review.get('learning', '請根據資料分析前後段配速與是否符合目的。')}",
+        f"- 焦點：{review.get('focus', '請整理這堂課真正留下來的是什麼。')}",
+        f"- 原因：{review.get('why', '請根據資料分析心率變化、漂移與環境影響。')}",
+        f"- 下一步：{review.get('looking_forward', '請根據資料分析步頻、步幅、接地時間與垂直振幅。')}",
         "",
         "## 圖卡要強調的三件事",
         f"- 配速策略：{review.get('learning', '請根據資料分析前後段配速與是否符合目的。')}",
@@ -854,7 +854,7 @@ def activity_daily_training_card_prompt(
         "",
         "## 課表結構與證據使用規則",
         "- 若有課表片段表，請優先把 WU / Main / Recovery / CD 當成主結構來理解今天這堂課。",
-        "- raw split 只能拿來補充證據，不要把 recovery、stride 或 cool-down 誤當成主體刺激。",
+        "- 原始分段只能拿來補充證據，不要把 recovery、stride 或 cool-down 誤當成主體刺激。",
         "- 如果平台判讀與你從資料看到的內容有落差，請保守處理，避免寫成過度確定的句子。",
         "",
         "## 卡片中的教練建議",
@@ -900,7 +900,7 @@ def activity_daily_training_card_prompt(
     if weekly_review:
         prompt_lines.extend([
             "",
-            "## Coach Context",
+            "## 教練脈絡",
             f"- 週回顧脈絡：{weekly_review.get('focus') or '—'}",
             f"- 週回顧學習：{weekly_review.get('learning') or '—'}",
         ])
@@ -977,7 +977,7 @@ def weekly_training_card_prompt(
         "請只根據我提供的內容整理，不要自行補故事、情緒、傷病、恢復狀態或未提供的訓練背景。",
         "如果資料不足，請保守處理並明確寫未提供，不要硬推論。",
         "請把內容整理成真正適合上圖卡的短文案，不要把完整分析逐段重貼。",
-        "請固定使用以下圖卡架構：1. 本週摘要 2. 本週位置 3. 結構重點 4. 關鍵課 5. Coach Knowledge 6. 下週提醒。",
+        "請固定使用以下圖卡架構：1. 本週摘要 2. 本週位置 3. 結構重點 4. 關鍵課 5. 教練知識 6. 下週提醒。",
         "",
         "## 本週摘要",
         f"- 標題：本週訓練回顧",
@@ -988,12 +988,12 @@ def weekly_training_card_prompt(
         f"- 平均配速 / 平均心率：{avg_pace_text} / {avg_hr_text or '—'}",
         "",
         "## 平台已整理的週判讀",
-        f"- Verdict：{review['verdict']}",
-        f"- Confidence：{confidence}",
-        f"- Learning：{review['learning']}",
-        f"- Focus：{review['focus']}",
-        f"- Why：{review['why']}",
-        f"- Next：{review['looking_forward']}",
+        f"- 判讀：{review['verdict']}",
+        f"- 信心：{confidence}",
+        f"- 學習：{review['learning']}",
+        f"- 焦點：{review['focus']}",
+        f"- 原因：{review['why']}",
+        f"- 下一步：{review['looking_forward']}",
         "",
         "## 圖卡要強調的三件事",
         f"- 這週真正留下來的是什麼：{review['learning']}",
@@ -1004,9 +1004,9 @@ def weekly_training_card_prompt(
     if knowledge_summary:
         prompt_lines.extend([
             "",
-            "## Coach Knowledge",
-            f"- Headline：{knowledge_summary['headline']}",
-            f"- Detail：{knowledge_summary['detail']}",
+            "## 教練知識",
+            f"- 重點：{knowledge_summary['headline']}",
+            f"- 說明：{knowledge_summary['detail']}",
         ])
 
     if pattern_insights or workout_structure_summary_rows:
@@ -1134,7 +1134,7 @@ def monthly_training_card_prompt(
         "請只根據我提供的內容整理，不要自行補故事、情緒、傷病、恢復狀態或未提供的訓練背景。",
         "如果月份仍在進行中，請把它寫成進度點，不要假裝是完整月總結。",
         "請把內容整理成真正適合上圖卡的短文案，不要把完整分析逐段重貼。",
-        "請固定使用以下圖卡架構：1. 本月摘要 2. 本月位置 3. 課表型態 4. 關鍵週與關鍵課 5. Coach Knowledge 6. 下月提醒。",
+        "請固定使用以下圖卡架構：1. 本月摘要 2. 本月位置 3. 課表型態 4. 關鍵週與關鍵課 5. 教練知識 6. 下月提醒。",
         "",
         "## 本月摘要",
         f"- 標題：本月訓練回顧",
@@ -1148,24 +1148,24 @@ def monthly_training_card_prompt(
         f"- 品質課 / 長跑：{quality_sessions} / {long_runs}",
         "",
         "## 平台已整理的月判讀",
-        f"- Position：{verdict}",
-        f"- Phase：{phase}",
-        f"- Confidence：{confidence}",
-        f"- Verdict Reason：{verdict_reason}",
+        f"- 位置：{verdict}",
+        f"- 階段：{phase}",
+        f"- 信心：{confidence}",
+        f"- 判讀原因：{verdict_reason}",
     ]
 
     if coach_memory:
         prompt_lines.extend([
-            f"- Previous Month：{coach_memory.get('previous_month_key') or '—'}",
-            f"- Follow-up：{coach_memory.get('follow_up') or '—'}",
+            f"- 上個月：{coach_memory.get('previous_month_key') or '—'}",
+            f"- 後續追蹤：{coach_memory.get('follow_up') or '—'}",
         ])
 
     if knowledge_summary:
         prompt_lines.extend([
             "",
-            "## Coach Knowledge",
-            f"- Headline：{knowledge_summary['headline']}",
-            f"- Detail：{knowledge_summary['detail']}",
+            "## 教練知識",
+            f"- 重點：{knowledge_summary['headline']}",
+            f"- 說明：{knowledge_summary['detail']}",
         ])
 
     if pattern_insights or workout_structure_summary_rows:
@@ -3042,7 +3042,7 @@ def coach_knowledge_summary(connection, start_date, end_date, period_label):
 
     if not complete_rows:
         return {
-            "headline": f"{period_label}的 Coach Knowledge 還在累積",
+            "headline": f"{period_label}的教練知識還在累積",
             "detail": "目前還沒有完整確認的活動可以回流到判讀，先讓第一批確認慢慢堆起來。",
             "count": 0,
             "proof_lines": [],
@@ -3555,7 +3555,7 @@ def activity_review_payload(activity, split_rows, workout_split_rows=None):
                 )
         else:
             pace_label = "節奏待補"
-            pace_note = "目前還沒有足夠 split 可以比較前後段。"
+            pace_note = "目前還沒有足夠分段可以比較前後段。"
         cards.append({
             "title": "節奏反應",
             "value": pace_label,
@@ -3593,7 +3593,7 @@ def activity_review_payload(activity, split_rows, workout_split_rows=None):
         if is_hot:
             body_parts.append(f"氣溫 {format_number(temperature, 0)}°C")
         if stamina_drop is not None:
-            body_parts.append(f"Stamina -{format_number(stamina_drop, 0)}")
+            body_parts.append(f"體力 -{format_number(stamina_drop, 0)}")
         if hr_change is not None:
             hr_scope = "主段起點到主段收尾" if structured_focus else "首末完整公里"
             if hr_change >= 0:
@@ -3621,9 +3621,9 @@ def activity_review_payload(activity, split_rows, workout_split_rows=None):
         if easy_run and has_short_active_segments:
             structure_note = "這堂課的主體先看 easy 段，課尾另有短加速與恢復片段，所以主體判讀不會把 stride 混進來。"
         elif has_structured_recovery and len(structured_active_rows) >= 2:
-            structure_note = "這堂課有明確主段與恢復切分，所以判讀會先按課表結構理解，再回頭核對 raw split。"
+            structure_note = "這堂課有明確主段與恢復切分，所以判讀會先按課表結構理解，再回頭核對原始分段。"
         elif structured_focus:
-            structure_note = "這堂課的判讀會先讀課表主體，再用 raw split 補證據，不會把暖身、恢復或收操混成同一段。"
+            structure_note = "這堂課的判讀會先讀課表主體，再用原始分段補證據，不會把暖身、恢復或收操混成同一段。"
 
     return {
         "learning_question": "這堂課，我真正練到了什麼？",
@@ -4891,7 +4891,7 @@ def overview_ai_handoff_text(attention, weekly_review, monthly_overview, latest_
     ]
     prompt_lines.extend(
         coach_prompt_reference_lines(
-            "Overview AI handoff",
+            "總覽 AI 交棒",
             "今天焦點、下一步入口與跨頁教練脈絡",
             [
                 "先回答今天最該先把注意力放在哪裡",
@@ -4900,10 +4900,10 @@ def overview_ai_handoff_text(attention, weekly_review, monthly_overview, latest_
                 "如果有額外觀察，請明確區分平台判讀與你補充的觀察",
             ],
             [
-                "Today Focus / Why Now / Primary Route / Continue Link",
-                "Weekly Context",
-                "Monthly Context",
-                "Latest Activity",
+                "今日焦點 / 為什麼是現在 / 主要入口 / 延伸連結",
+                "週脈絡",
+                "月脈絡",
+                "最新活動",
             ],
             [
                 "只能根據提供內容分析，不要自行發明額外訓練、健康或心理狀態。",
@@ -4913,69 +4913,69 @@ def overview_ai_handoff_text(attention, weekly_review, monthly_overview, latest_
     )
     prompt_lines.extend([
         "",
-        "## Overview Facts",
-        f"- Today Focus：{safe_text(attention.get('title'))}",
-        f"- Why Now：{safe_text(attention.get('why'))}",
-        f"- Primary Route：{target_label}",
-        f"- Continue Link：{safe_text(attention.get('cta'))}",
+        "## 總覽事實",
+        f"- 今日焦點：{safe_text(attention.get('title'))}",
+        f"- 為什麼是現在：{safe_text(attention.get('why'))}",
+        f"- 主要入口：{target_label}",
+        f"- 延伸連結：{safe_text(attention.get('cta'))}",
     ])
 
     if attention.get("secondary_note"):
-        prompt_lines.append(f"- Secondary Note：{safe_text(attention.get('secondary_note'))}")
+        prompt_lines.append(f"- 次要補充：{safe_text(attention.get('secondary_note'))}")
 
     if attention.get("evidence"):
         prompt_lines.extend([
             "",
-            "## Coach Attention",
+            "## 教練注意力",
             *[f"- {item}" for item in attention["evidence"]],
         ])
 
     if weekly_review:
         prompt_lines.extend([
             "",
-            "## Weekly Context",
-            f"- Focus：{safe_text(weekly_review.get('focus'))}",
-            f"- Learning：{safe_text(weekly_review.get('learning'))}",
-            f"- Next：{safe_text(weekly_review.get('looking_forward'))}",
+            "## 週脈絡",
+            f"- 焦點：{safe_text(weekly_review.get('focus'))}",
+            f"- 學習：{safe_text(weekly_review.get('learning'))}",
+            f"- 下一步：{safe_text(weekly_review.get('looking_forward'))}",
         ])
 
     if monthly_overview:
         prompt_lines.extend([
             "",
-            "## Monthly Context",
-            f"- Position：{safe_text(monthly_overview.get('verdict'))}",
-            f"- Phase：{safe_text(monthly_overview.get('phase'))}",
-            f"- Summary：{safe_text(monthly_overview.get('verdict_reason'))}",
+            "## 月脈絡",
+            f"- 位置：{safe_text(monthly_overview.get('verdict'))}",
+            f"- 階段：{safe_text(monthly_overview.get('phase'))}",
+            f"- 摘要：{safe_text(monthly_overview.get('verdict_reason'))}",
         ])
         if monthly_overview.get("progress_pct") is not None:
-            prompt_lines.append(f"- Progress：{format_number(monthly_overview['progress_pct'], 0)}%")
+            prompt_lines.append(f"- 進度：{format_number(monthly_overview['progress_pct'], 0)}%")
 
     if latest_activity:
         prompt_lines.extend([
             "",
-            "## Latest Activity",
-            f"- Date：{safe_text(format_short_datetime(latest_activity['activity_start_time']))}",
-            f"- Activity：{safe_text(latest_activity['activity_name'] or latest_activity['activity_type'] or '活動')}",
-            f"- Distance：{format_number(latest_activity['distance_km'], 2) or '—'} km",
-            f"- Pace：{format_pace_seconds(latest_activity['avg_pace_sec_per_km']) or '—'}",
-            f"- HR：{'' if latest_activity['avg_hr'] is None else int(round(latest_activity['avg_hr']))}",
-            f"- Load：{format_number(latest_activity['training_load'], 1) or '—'}",
-            f"- Workout：{safe_text(latest_activity['workout_type_name_en'] or '未標註')}",
-            f"- Purpose：{safe_text(latest_activity['primary_training_purpose_name_en'] or '未標註')}",
-            f"- Shoe：{safe_text(latest_activity['shoe_display_name'] or '未標註')}",
+            "## 最新活動",
+            f"- 日期：{safe_text(format_short_datetime(latest_activity['activity_start_time']))}",
+            f"- 活動：{safe_text(latest_activity['activity_name'] or latest_activity['activity_type'] or '活動')}",
+            f"- 距離：{format_number(latest_activity['distance_km'], 2) or '—'} km",
+            f"- 配速：{format_pace_seconds(latest_activity['avg_pace_sec_per_km']) or '—'}",
+            f"- 心率：{'' if latest_activity['avg_hr'] is None else int(round(latest_activity['avg_hr']))}",
+            f"- 負荷：{format_number(latest_activity['training_load'], 1) or '—'}",
+            f"- 課表：{safe_text(latest_activity['workout_type_name_en'] or '未標註')}",
+            f"- 目的：{safe_text(latest_activity['primary_training_purpose_name_en'] or '未標註')}",
+            f"- 鞋款：{safe_text(latest_activity['shoe_display_name'] or '未標註')}",
         ])
 
     append_previous_ai_response(prompt_lines, saved_reply)
 
     prompt_lines.extend([
         "",
-        "## Instructions",
+        "## 指示",
         "- 先講今天最該先把注意力放在哪裡。",
         "- 再解釋平台為什麼會先把這個焦點推到前面。",
         "- 最後建議我應該先去單堂課、週回顧、月回顧或鞋款哪一頁繼續看。",
-        "- 如果你從 Weekly、Monthly 或 Latest Activity context 看見平台尚未明說、但值得注意的補充，可以提出。",
-        "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據 context 額外補充的觀察。",
-        "- 如果不同 context 彼此有張力，請指出張力，不要直接覆蓋平台目前的注意力判斷。",
+        "- 如果你從週、月或最新活動脈絡看見平台尚未明說、但值得注意的補充，可以提出。",
+        "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據脈絡額外補充的觀察。",
+        "- 如果不同脈絡彼此有張力，請指出張力，不要直接覆蓋平台目前的注意力判斷。",
     ])
     prompt_lines.extend([""] + ai_handoff_response_format_instructions())
 
@@ -4995,14 +4995,14 @@ def overview_ai_handoff_panel(attention, weekly_review, monthly_overview, latest
       <section class="panel-section" id="overview-ai-handoff">
         <h2>AI 延伸分析</h2>
         <div class="review-card ai-handoff-card">
-          <span>AI Share Handoff</span>
+          <span>AI 交棒</span>
           <strong>把今天的注意力焦點直接交給你習慣的 AI</strong>
           <p>如果你看完總覽後，想沿著平台已經整理好的注意力、上下文與下一步入口繼續往下聊，這裡就是完整交棒內容。</p>
           <div class="ai-handoff-block">
             <div class="ai-handoff-block-head">
               <div>
-                <strong>完整 handoff</strong>
-                <p class="note">包含今天焦點、Weekly／Monthly 脈絡與最近一堂課。</p>
+                <strong>完整交棒內容</strong>
+                <p class="note">包含今天焦點、週／月脈絡與最近一堂課。</p>
               </div>
               <div class="ai-handoff-actions">
                 <button class="secondary-action" type="button" onclick="copyAiHandoff('overview-ai-handoff-text')">複製給 AI</button>
@@ -5136,7 +5136,7 @@ def rac_entry_panel():
     href = "/open-rac"
     status = "CoachOS Import Studio 已就緒" if rac_is_running() else "從這裡進入 CoachOS Import Studio"
     note = (
-        "把 FIT 轉成 Excel、補活動資訊、寫回 SQLite，然後再回到 CoachOS 繼續看 Activity、Weekly、Monthly。"
+        "把 FIT 轉成 Excel、補活動資訊、寫回 SQLite，然後再回到 CoachOS 繼續看活動、週回顧與月回顧。"
     )
     return f"""
       <section class="panel-section">
@@ -5161,7 +5161,7 @@ def no_data_yet_panel():
         <div class="coach-attention-card no-focus">
           <span>第一次使用</span>
           <strong>目前還沒有跑步資料</strong>
-          <p>這不是錯誤。先進入資料匯入工具匯入第一批 FIT，平台就會開始長出 Activity、Weekly、Monthly 與 Overview。</p>
+          <p>這不是錯誤。先進入資料匯入工具匯入第一批 FIT，平台就會開始長出活動、週回顧、月回顧與總覽。</p>
           <ul class="coach-attention-evidence">
             <li>先選一個或幾個 FIT 檔</li>
             <li>轉成 Excel 並寫回 SQLite</li>
@@ -5169,7 +5169,7 @@ def no_data_yet_panel():
           </ul>
           <div class="coach-attention-footer">
             <a class="desk-link" href="/open-rac">先進入資料匯入工具</a>
-            <small>第一批資料匯入後，首頁會自動變成真正的 Overview。</small>
+            <small>第一批資料匯入後，首頁會自動變成真正的總覽。</small>
           </div>
         </div>
       </section>
@@ -5711,7 +5711,7 @@ def range_label(label, values, formatter):
 
 def trend_svg(split_rows):
     if not split_rows:
-        return '<p class="note">目前沒有 split 可畫趨勢。</p>'
+        return '<p class="note">目前沒有分段可畫趨勢。</p>'
     width = 860
     height = 260
     padding = 28
@@ -6017,7 +6017,7 @@ def weekly_selector_bar(weeks, selected_week, page_slug="weekly"):
             </label>
           </form>
         </div>
-        <p class="note">Weekly 只保留最近 5 週，讓這一頁專注在短期學習。更早以前的資料先留在背景裡，不打斷這一週真正留下來的東西。</p>
+        <p class="note">週回顧只保留最近 5 週，讓這一頁專注在短期學習。更早以前的資料先留在背景裡，不打斷這一週真正留下來的東西。</p>
       </section>
     """
 
@@ -6385,7 +6385,7 @@ def monthly_briefing_why_points(monthly, intelligence, progress_row, coach_memor
 
     if knowledge_summary and knowledge_summary.get("count"):
         points.append(
-            f"Coach Knowledge 已累積 {knowledge_summary['count']} 堂已確認活動，月回顧的判讀會更偏向已確認的訓練脈絡。"
+            f"教練知識已累積 {knowledge_summary['count']} 堂已確認活動，月回顧的判讀會更偏向已確認的訓練脈絡。"
         )
 
     return points[:4]
@@ -7020,14 +7020,14 @@ def weekly_ai_handoff_text(
 
     context_lines = []
     if overview_attention:
-        context_lines.append(f"- Overview Focus：{overview_attention.get('title') or '—'}")
+        context_lines.append(f"- 總覽焦點：{overview_attention.get('title') or '—'}")
     if monthly_overview:
-        context_lines.append(f"- Monthly Position：{monthly_overview.get('verdict') or '—'}")
-        context_lines.append(f"- Monthly Summary：{monthly_overview.get('verdict_reason') or '—'}")
+        context_lines.append(f"- 月度位置：{monthly_overview.get('verdict') or '—'}")
+        context_lines.append(f"- 月度摘要：{monthly_overview.get('verdict_reason') or '—'}")
 
     if knowledge_summary:
-        context_lines.append(f"- Coach Knowledge：{knowledge_summary['headline']}")
-        context_lines.append(f"- Confirmed Knowledge：{knowledge_summary['detail']}")
+        context_lines.append(f"- 教練知識：{knowledge_summary['headline']}")
+        context_lines.append(f"- 已確認知識：{knowledge_summary['detail']}")
 
     prompt_lines = [
         "請根據以下已治理的跑步資料，用繁體中文做進一步分析。",
@@ -7036,21 +7036,21 @@ def weekly_ai_handoff_text(
     ]
     prompt_lines.extend(
         coach_prompt_reference_lines(
-            "Weekly AI handoff",
+            "週回顧 AI 交棒",
             "這週真正留下來的學習、原因與下週提醒",
             [
                 "先回答這週真正留下來的是什麼",
                 "再說明原因",
                 "最後只留一個下週提醒",
-                "優先沿著 Coach Understanding → Reasoning → Key Activities → Evidence 的順序理解",
+                "優先沿著 教練理解 → 推理 → 關鍵活動 → 證據 的順序理解",
             ],
             [
                 "週期區間、活動數、里程、負荷、平均心率",
-                "Coach Understanding",
-                "Reasoning",
-                "Key Activities Behind This Learning",
-                "Context",
-                "Evidence",
+                "教練理解",
+                "推理",
+                "支撐這個學習的關鍵活動",
+                "上下文",
+                "證據",
             ],
             [
                 "如果 platform 判讀已經足以支持結論，不要因為 raw evidence 有更多資訊而重建另一套與平台相反的故事。",
@@ -7060,7 +7060,7 @@ def weekly_ai_handoff_text(
     )
     prompt_lines.extend([
         "",
-        "## Weekly Snapshot",
+        "## 本週快照",
         f"- 週期：{period_text}",
         f"- 活動數：{activities_text}",
         f"- 里程：{total_km}",
@@ -7069,31 +7069,31 @@ def weekly_ai_handoff_text(
         f"- 相對基準負荷：{format_delta_pct(intelligence['load_delta']) if intelligence['load_delta'] is not None else '基準建立中'}",
         f"- 相對基準里程：{format_delta_pct(intelligence['km_delta']) if intelligence['km_delta'] is not None else '—'}",
         "",
-        "## Coach Understanding",
+        "## 教練理解",
         f"- 問題：{review['learning_question']}",
-        f"- Verdict：{review['verdict']}",
-        f"- Confidence：{confidence}",
-        f"- Learning：{review['learning']}",
-        f"- Focus：{review['focus']}",
-        f"- Why：{review['why']}",
-        f"- Next：{review['looking_forward']}",
+        f"- 判讀：{review['verdict']}",
+        f"- 信心：{confidence}",
+        f"- 學習：{review['learning']}",
+        f"- 焦點：{review['focus']}",
+        f"- 原因：{review['why']}",
+        f"- 下一步：{review['looking_forward']}",
         "",
-        "## Reasoning",
+        "## 推理",
         *cause_lines,
     ])
 
     if knowledge_summary:
         prompt_lines.extend([
             "",
-            "## Coach Knowledge",
-            f"- Headline：{knowledge_summary['headline']}",
-            f"- Detail：{knowledge_summary['detail']}",
+            "## 教練知識",
+            f"- 重點：{knowledge_summary['headline']}",
+            f"- 說明：{knowledge_summary['detail']}",
         ])
 
     if key_session_lines:
         prompt_lines.extend([
             "",
-            "## Key Activities Behind This Learning",
+            "## 支撐這個學習的關鍵活動",
             *key_session_lines,
         ])
 
@@ -7101,7 +7101,7 @@ def weekly_ai_handoff_text(
         pattern_insights = workout_structure_pattern_insights(workout_structure_summary_rows, "本週")
         prompt_lines.extend([
             "",
-            "## Workout Structure Patterns",
+            "## 課表結構模式",
         ])
         prompt_lines.extend(f"- {line}" for line in pattern_insights)
         for row in workout_structure_summary_rows:
@@ -7112,14 +7112,14 @@ def weekly_ai_handoff_text(
     if context_lines:
         prompt_lines.extend([
             "",
-            "## Context",
+            "## 上下文",
             *context_lines,
         ])
 
     if include_raw_data and history_rows:
         prompt_lines.extend([
             "",
-            "## Evidence",
+            "## 證據",
             "### 最近 5 週節奏",
             "| 週別 | Coach | 期間 | 活動數 | KM | 時間 | 配速 | 平均心率 | 負荷 |",
             "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
@@ -7162,15 +7162,15 @@ def weekly_ai_handoff_text(
 
     prompt_lines.extend([
         "",
-        "## Instructions",
+        "## 指示",
         "- 先講這週真正留下來的是什麼。",
         "- 再解釋為什麼平台會這樣判讀。",
         "- 最後只留一個下週提醒。",
-        "- 優先沿著 Coach Understanding → Reasoning → Key Activities → Evidence 的順序理解。",
+        "- 優先沿著 教練理解 → 推理 → 關鍵活動 → 證據 的順序理解。",
         "- 如果你從最近 5 週節奏看見平台尚未明說、但值得注意的變化，可以補充提出。",
-        "- 如果平台判讀已經足以支持結論，不要因為 raw evidence 有更多資訊而重建另一套與平台相反的故事。",
-        "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據 evidence 額外補充的觀察。",
-        "- 如果 evidence 與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
+        "- 如果平台判讀已經足以支持結論，不要因為原始證據有更多資訊而重建另一套與平台相反的故事。",
+        "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據證據額外補充的觀察。",
+        "- 如果證據與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
     ])
     prompt_lines.extend([""] + ai_handoff_response_format_instructions())
 
@@ -7229,13 +7229,13 @@ def weekly_ai_handoff_panel(
       <section class="panel-section" id="weekly-ai-handoff">
         <h2>AI 延伸分析</h2>
         <div class="review-card ai-handoff-card">
-          <span>AI Share Handoff</span>
+          <span>AI 交棒</span>
           <strong>把這週的教練學習脈絡直接交給你習慣的 AI</strong>
           <p>如果你看完這週後，想沿著平台已經整理好的學習、關鍵課與最近五週 evidence 繼續往下聊，這裡就是完整交棒內容。</p>
           <div class="ai-handoff-block">
             <div class="ai-handoff-block-head">
               <div>
-                <strong>完整 handoff</strong>
+                <strong>完整交棒內容</strong>
                 <p class="note">包含這週判讀、形成原因、關鍵課與最近 5 週 evidence。</p>
               </div>
               <div class="ai-handoff-actions">
@@ -7250,14 +7250,14 @@ def weekly_ai_handoff_panel(
           <p class="note" id="weekly-ai-handoff-status">先看完這週，再複製交給你習慣的 AI 繼續分析。</p>
         </div>
         <div class="review-card ai-handoff-card">
-          <span>Weekly Training Card Prompt</span>
+          <span>週訓練圖卡提示</span>
           <strong>把這週分析交給圖像 AI 做成週訓練圖卡</strong>
           <p>這個 prompt 會把本週位置、課表型態、關鍵課與下週提醒整理成適合 16:9 圖卡的文案。</p>
           <div class="ai-handoff-block">
             <div class="ai-handoff-block-head">
               <div>
                 <strong>週圖卡 prompt</strong>
-                <p class="note">不會直接重貼完整 handoff，而是改寫成適合圖像 AI 的圖卡內容。</p>
+                <p class="note">不會直接重貼完整交棒內容，而是改寫成適合圖像 AI 的圖卡內容。</p>
               </div>
               <div class="ai-handoff-actions">
                 <button class="secondary-action" type="button" onclick="copyAiHandoff('weekly-training-card-prompt')">複製給 AI</button>
@@ -7268,7 +7268,7 @@ def weekly_ai_handoff_panel(
               <textarea id="weekly-training-card-prompt" readonly>{html.escape(weekly_card_prompt)}</textarea>
             </details>
           </div>
-          <p class="note">如果你想快速做一張本週訓練圖卡，直接用這段就可以，不需要先跑完整 AI handoff。</p>
+          <p class="note">如果你想快速做一張本週訓練圖卡，直接用這段就可以，不需要先跑完整 AI 交棒。</p>
         </div>
       </section>
       {capture_panel}
@@ -7382,7 +7382,7 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
     ]
     prompt_lines.extend(
         coach_prompt_reference_lines(
-            "Monthly AI handoff",
+            "月回顧 AI 交棒",
             "這個月的位置、原因與下個月提醒",
             [
                 "先回答這個月目前位於什麼訓練位置",
@@ -7392,11 +7392,11 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
             ],
             [
                 "月份、狀態、里程、時間、負荷、活動數、平均配速、平均心率",
-                "Coach Position",
-                "Reasoning",
-                "Key Weeks Behind This Position",
-                "Key Activities Behind This Position",
-                "Evidence",
+                "教練位置",
+                "推理",
+                "支撐這個位置的關鍵週",
+                "支撐這個位置的關鍵活動",
+                "證據",
             ],
             [
                 "若資料不足，請把月度判讀視為進度檢查，不要硬推完整結論。",
@@ -7406,7 +7406,7 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
     )
     prompt_lines.extend([
         "",
-        "## Monthly Facts",
+        "## 月度事實",
         f"- 月份：{monthly['month_key']}",
         f"- 狀態：{'進行中' if intelligence['is_partial_month'] else '完整'}",
         f"- 截至：{monthly['latest_date']}" if monthly["latest_date"] else "- 截至：—",
@@ -7421,27 +7421,27 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
         f"- 品質課數：{quality_sessions}",
         f"- 長跑數：{long_runs}",
         "",
-        "## Coach Position",
-        f"- Position：{verdict}",
-        f"- Phase：{phase}",
-        f"- Confidence：{confidence}",
-        f"- Opening：{letter['opening']}",
-        f"- Learning：{intelligence['coach_summary']}",
-        f"- Verdict Reason：{verdict_reason}",
-        f"- Next：{letter['looking_forward']}",
+        "## 教練位置",
+        f"- 位置：{verdict}",
+        f"- 階段：{phase}",
+        f"- 信心：{confidence}",
+        f"- 開場：{letter['opening']}",
+        f"- 學習：{intelligence['coach_summary']}",
+        f"- 判讀原因：{verdict_reason}",
+        f"- 下一步：{letter['looking_forward']}",
     ])
 
     if coach_memory:
         prompt_lines.extend([
-            f"- Previous Month：{coach_memory['previous_month_key']}",
-            f"- Previous Recommendation：{coach_memory['previous_recommendation']}",
-            f"- Follow-up：{coach_memory['follow_up']}",
+            f"- 上個月：{coach_memory['previous_month_key']}",
+            f"- 上月建議：{coach_memory['previous_recommendation']}",
+            f"- 後續追蹤：{coach_memory['follow_up']}",
         ])
 
     if knowledge_summary:
         prompt_lines.extend([
-            f"- Coach Knowledge：{knowledge_summary['headline']}",
-            f"- Confirmed Knowledge：{knowledge_summary['detail']}",
+            f"- 教練知識：{knowledge_summary['headline']}",
+            f"- 已確認知識：{knowledge_summary['detail']}",
         ])
 
     reasoning_lines = []
@@ -7479,21 +7479,21 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
 
     prompt_lines.extend([
         "",
-        "## Reasoning",
+        "## 推理",
         *[f"- {point}" for point in reasoning_lines[:4]],
     ])
 
     if week_lines:
         prompt_lines.extend([
             "",
-            "## Key Weeks Behind This Position",
+            "## 支撐這個位置的關鍵週",
             *week_lines,
         ])
 
     if key_session_lines:
         prompt_lines.extend([
             "",
-            "## Key Activities Behind This Position",
+            "## 支撐這個位置的關鍵活動",
             *key_session_lines,
         ])
 
@@ -7501,7 +7501,7 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
         pattern_insights = workout_structure_pattern_insights(workout_structure_summary_rows, "本月")
         prompt_lines.extend([
             "",
-            "## Workout Structure Patterns",
+            "## 課表結構模式",
         ])
         prompt_lines.extend(f"- {line}" for line in pattern_insights)
         for row in workout_structure_summary_rows:
@@ -7512,7 +7512,7 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
     if include_raw_data and distribution_rows:
         prompt_lines.extend([
             "",
-            "## Evidence",
+            "## 證據",
             "### 本月訓練結構",
             "| 課表 | 目的 | 活動數 | KM | 平均負荷 |",
             "| --- | --- | --- | --- | --- |",
@@ -7532,15 +7532,15 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
 
     prompt_lines.extend([
         "",
-        "## Instructions",
+        "## 指示",
         "- 先講這個月目前位於什麼訓練位置。",
         "- 再解釋平台為什麼會這樣判讀。",
         "- 最後只留一個下個月提醒。",
-        "- 優先沿著 Coach Position → Reasoning → Key Weeks → Key Activities → Evidence 的順序理解。",
+        "- 優先沿著 教練位置 → 推理 → 關鍵週 → 關鍵活動 → 證據 的順序理解。",
         "- 目前月份仍在進行中時，避免把目前進度描述成完整月結論。",
         "- 如果你從 key weeks、key activities 或本月訓練結構看見平台尚未明說、但值得注意的變化，可以補充提出。",
-        "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據 evidence 額外補充的觀察。",
-        "- 如果 evidence 與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
+        "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據證據額外補充的觀察。",
+        "- 如果證據與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
     ])
     prompt_lines.extend([""] + ai_handoff_response_format_instructions())
 
@@ -7585,13 +7585,13 @@ def monthly_ai_handoff_panel(monthly, intelligence, progress_row, distribution_r
       <section class="panel-section" id="monthly-ai-handoff">
         <h2>AI 延伸分析</h2>
         <div class="review-card ai-handoff-card">
-          <span>AI Share Handoff</span>
+          <span>AI 交棒</span>
           <strong>把這個月的教練位置判讀直接交給你習慣的 AI</strong>
           <p>如果你看完這個月後，想沿著平台已經整理好的位置、形成原因、關鍵週與關鍵課繼續往下聊，這裡就是完整交棒內容。</p>
           <div class="ai-handoff-block">
             <div class="ai-handoff-block-head">
               <div>
-                <strong>完整 handoff</strong>
+                <strong>完整交棒內容</strong>
                 <p class="note">包含月判讀、形成原因、關鍵週、關鍵課與本月訓練結構。</p>
               </div>
               <div class="ai-handoff-actions">
@@ -7606,7 +7606,7 @@ def monthly_ai_handoff_panel(monthly, intelligence, progress_row, distribution_r
           <p class="note" id="monthly-ai-handoff-status">先看完這個月，再複製交給你習慣的 AI 繼續分析。</p>
         </div>
         <div class="review-card ai-handoff-card">
-          <span>Monthly Training Card Prompt</span>
+          <span>月訓練圖卡提示</span>
           <strong>把這個月分析交給圖像 AI 做成月訓練圖卡</strong>
           <p>這個 prompt 會把月度位置、代表型態、關鍵週與關鍵課整理成適合 16:9 圖卡的文案。</p>
           <div class="ai-handoff-block">
@@ -7624,7 +7624,7 @@ def monthly_ai_handoff_panel(monthly, intelligence, progress_row, distribution_r
               <textarea id="monthly-training-card-prompt" readonly>{html.escape(monthly_card_prompt)}</textarea>
             </details>
           </div>
-          <p class="note">如果你想快速做一張本月訓練圖卡，直接用這段就可以，不需要先跑完整 AI handoff。</p>
+          <p class="note">如果你想快速做一張本月訓練圖卡，直接用這段就可以，不需要先跑完整 AI 交棒。</p>
         </div>
       </section>
       {capture_panel}
@@ -7728,7 +7728,7 @@ def activity_key_segments(activity, split_rows, workout_split_rows=None):
 def activity_fragment_table(activity, split_rows, workout_split_rows=None):
     rows = activity_key_segments(activity, split_rows, workout_split_rows)
     if not rows:
-        return '<p class="note">目前還沒有足夠的 split 可以建立關鍵片段。</p>'
+        return '<p class="note">目前還沒有足夠的分段可以建立關鍵片段。</p>'
 
     body = []
     for row in rows:
@@ -7910,7 +7910,7 @@ def activity_facts_panel(activity, split_rows=None, workout_split_rows=None):
         "心率",
         [
             raw_data_row("平均心率", "" if activity["avg_hr"] is None else f"{int(round(activity['avg_hr']))} bpm"),
-            raw_data_row("最大心率", "" if (activity["max_hr"] is None and max_split_hr is None) else f"{int(round(activity['max_hr'] or max_split_hr))} bpm"),
+            raw_data_row("活動最高心率", "" if max_split_hr is None else f"{int(round(max_split_hr))} bpm"),
         ],
     )
     stamina_group = raw_data_group(
@@ -7937,7 +7937,7 @@ def activity_facts_panel(activity, split_rows=None, workout_split_rows=None):
         [
             raw_data_row("平均功率", "" if avg_split_power is None else f"{format_number(avg_split_power, 0)} W"),
             raw_data_row("最大功率", "" if max_split_power is None else f"{format_number(max_split_power, 0)} W"),
-            raw_data_row("臨界功率", "" if activity["critical_power_w"] is None else f"{format_number(activity['critical_power_w'], 0)} W"),
+            raw_data_row("個人臨界功率", "" if activity["critical_power_w"] is None else f"{format_number(activity['critical_power_w'], 0)} W"),
         ],
     )
     dynamics_group = raw_data_group(
@@ -7987,9 +7987,9 @@ def activity_facts_panel(activity, split_rows=None, workout_split_rows=None):
 
     split_tab = f"""
       <div class="raw-data-tab-panel" data-raw-panel="split" hidden>
-        <p class="note raw-data-split-note">先看課表片段，再往下看每公里 raw split，會比只看公里數更接近這堂課原本的設計。</p>
+        <p class="note raw-data-split-note">先看課表片段，再往下看每公里原始分段，會比只看公里數更接近這堂課原本的設計。</p>
         {activity_workout_structure_table(workout_split_rows)}
-        <p class="note raw-data-split-note">下面這張是每公里 raw split，所以 2K 主段會拆成兩列 1K，0.5K 恢復也會保留成半公里。</p>
+        <p class="note raw-data-split-note">下面這張是每公里原始分段，所以 2K 主段會拆成兩列 1K，0.5K 恢復也會保留成半公里。</p>
         {activity_split_table(split_rows)}
       </div>
     """
@@ -8002,15 +8002,15 @@ def activity_facts_panel(activity, split_rows=None, workout_split_rows=None):
 
     return f"""
       <section class="panel-section" id="activity-raw">
-        <h2>Raw Data</h2>
+        <h2>原始資料</h2>
         <p class="note">先保留你跑完會先看的重點，更多 Garmin 細節收起來，想核對時再展開。</p>
         <div class="review-card metric-collection raw-data-card">
           <div class="reasoning-jump-row">
-            <a class="inline-jump-link" href="#activity-summary">Activity Summary</a>
-            <a class="inline-jump-link" href="#activity-review">Coach Review</a>
-            <a class="inline-jump-link" href="#activity-knowledge">Coach Knowledge</a>
-            <a class="inline-jump-link" href="#activity-evidence">Evidence</a>
-            <a class="inline-jump-link" href="#activity-ai-handoff">AI Extension</a>
+            <a class="inline-jump-link" href="#activity-summary">活動摘要</a>
+            <a class="inline-jump-link" href="#activity-review">教練判讀</a>
+            <a class="inline-jump-link" href="#activity-knowledge">教練知識</a>
+            <a class="inline-jump-link" href="#activity-evidence">證據</a>
+            <a class="inline-jump-link" href="#activity-ai-handoff">AI 延伸</a>
           </div>
           <div class="detail-chips raw-data-key-chips">
             {"".join(chips)}
@@ -8019,7 +8019,7 @@ def activity_facts_panel(activity, split_rows=None, workout_split_rows=None):
           <div class="raw-data-details-panel" id="activity-raw-details" hidden>
             <div class="raw-data-tablist" role="tablist" aria-label="Garmin 細節">
               <button class="raw-data-tab active" type="button" data-raw-tab="data">數據</button>
-              <button class="raw-data-tab" type="button" data-raw-tab="split">split</button>
+              <button class="raw-data-tab" type="button" data-raw-tab="split">分段</button>
               <button class="raw-data-tab" type="button" data-raw-tab="chart">圖表</button>
             </div>
             <div class="raw-data-tab-panels">
@@ -8267,7 +8267,7 @@ def activity_coach_knowledge_panel(activity, split_rows, shoe_rows, workout_rows
         }) + "#metadata-edit"
         return f"""
           <section class="panel-section" id="activity-knowledge">
-            <h2>Coach Knowledge</h2>
+            <h2>教練知識</h2>
             <p class="note">先選一個最像的，確認後 CoachOS 才會記住這堂課。</p>
             <div class="review-card knowledge-conversation-card">
               <span>這堂課的鞋款 · 🏃</span>
@@ -8293,7 +8293,7 @@ def activity_coach_knowledge_panel(activity, split_rows, shoe_rows, workout_rows
         }) + "#metadata-edit"
         return f"""
           <section class="panel-section" id="activity-knowledge">
-            <h2>Coach Knowledge</h2>
+            <h2>教練知識</h2>
             <p class="note">先選一個最像的，確認後 CoachOS 才會記住這堂課。</p>
             <div class="review-card knowledge-conversation-card">
               <span>這堂課的課表 · ⚡</span>
@@ -8319,7 +8319,7 @@ def activity_coach_knowledge_panel(activity, split_rows, shoe_rows, workout_rows
         }) + "#metadata-edit"
         return f"""
           <section class="panel-section" id="activity-knowledge">
-            <h2>Coach Knowledge</h2>
+            <h2>教練知識</h2>
             <p class="note">先選一個最像的，確認後 CoachOS 才會記住這堂課。</p>
             <div class="review-card knowledge-conversation-card">
               <span>這堂課的訓練目的 · 🎯</span>
@@ -8341,7 +8341,7 @@ def activity_coach_knowledge_panel(activity, split_rows, shoe_rows, workout_rows
         review_href = f'/?page=activity&activity={activity_id}&coach_step=purpose_learned#activity-evidence'
         return f"""
           <section class="panel-section" id="activity-knowledge">
-            <h2>Coach Knowledge</h2>
+            <h2>教練知識</h2>
             <p class="note">這堂課已經有完整標註，CoachOS 會直接讀。</p>
             <div class="review-card knowledge-learned-card">
               <span class="knowledge-complete-badge">✓ 已完整標註 · 這堂課可直接讀取</span>
@@ -8372,7 +8372,7 @@ def activity_coach_knowledge_panel(activity, split_rows, shoe_rows, workout_rows
     if learned_mode:
         return f"""
           <section class="panel-section" id="activity-knowledge">
-            <h2>Coach Knowledge</h2>
+            <h2>教練知識</h2>
             <p class="note">先選一個最像的，確認後 CoachOS 才會記住這堂課。</p>
             <div class="review-card knowledge-learned-card">
               <span class="knowledge-complete-badge">✓ 已完成 · 這堂課的{html.escape(state["label"])} · {html.escape(state["icon"])}</span>
@@ -8419,7 +8419,7 @@ def activity_coach_knowledge_panel(activity, split_rows, shoe_rows, workout_rows
 
     return f"""
       <section class="panel-section" id="activity-knowledge">
-        <h2>Coach Knowledge</h2>
+        <h2>教練知識</h2>
         <p class="note">先選一個最像的，確認後 CoachOS 才會記住這堂課。</p>
         <div class="review-card knowledge-conversation-card">
           <span>這堂課的{html.escape(state["label"])} · {html.escape(state["icon"])}</span>
@@ -8458,7 +8458,7 @@ def activity_coach_knowledge_panel(activity, split_rows, shoe_rows, workout_rows
 
 def activity_split_table(split_rows):
     if not split_rows:
-        return '<p class="note">目前還沒有每公里 split 可以往下看。</p>'
+        return '<p class="note">目前還沒有每公里分段可以往下看。</p>'
     body = []
     for row in split_rows:
         cadence = "" if row["avg_cadence_spm"] is None else format_number(row["avg_cadence_spm"], 1)
@@ -8677,7 +8677,7 @@ def structured_segment_label_for_split(row, split_rows, workout_split_rows):
 def activity_workout_structure_table(workout_split_rows):
     rows = display_workout_splits(workout_split_rows)
     if not rows:
-        return '<p class="note">這堂課目前沒有可讀的課表片段，先看下面的 raw split。</p>'
+        return '<p class="note">這堂課目前沒有可讀的課表片段，先看下面的原始分段。</p>'
     body = []
     for index, row in enumerate(rows, start=1):
         distance_text = (
@@ -8747,7 +8747,7 @@ def activity_ai_handoff_text(
     vratio_text = format_number(activity["avg_vertical_ratio_pct"], 1) if activity["avg_vertical_ratio_pct"] is not None else None
     recorded_duration_text = format_duration_hms(activity["duration_sec"])
     split_total_text = format_duration_hms(split_total_time_sec(split_rows))
-    athlete_max_hr_text = raw_text(activity["max_hr"])
+    stored_activity_max_hr_text = raw_text(activity["max_hr"])
     activity_max_hr_text = raw_text("" if split_activity_max_hr(split_rows) is None else int(round(split_activity_max_hr(split_rows))))
 
     activity_name = str(activity["activity_name"] or activity["activity_type"] or "活動")
@@ -8784,31 +8784,31 @@ def activity_ai_handoff_text(
     ]
     prompt_lines.extend(
         coach_prompt_reference_lines(
-            "Activity AI handoff",
+            "活動 AI 交棒",
             "這堂課的整體判讀、原因與下一步提醒",
             [
                 "先回答這堂課真正留下來的是什麼",
                 "再說明為什麼平台會這樣判讀",
                 "最後只留一個下一堂課提醒",
-                "若 raw data 與平台判讀有衝突，先指出衝突",
+                "若原始資料與平台判讀有衝突，先指出衝突",
             ],
             [
-                "Activity Facts",
-                "Coach Understanding",
-                "Reasoning",
-                "Attention Segments",
-                "Context",
-                "Evidence",
+                "活動事實",
+                "教練理解",
+                "推理",
+                "關鍵片段",
+                "上下文",
+                "證據",
             ],
             [
-                "不要只看配速，必須整合心率、功率、跑姿、Stamina、天氣與課表目的。",
+                "不要只看配速，必須整合心率、功率、跑姿、體力、天氣與課表目的。",
                 "若資料不足，明確說明不足處，不要硬推論。",
             ],
         )
     )
     prompt_lines.extend([
         "",
-        "## Activity Facts",
+        "## 活動事實",
         f"- 活動：{activity_name}",
         f"- 開始時間：{start_time}",
         f"- 類型：{workout_name}",
@@ -8824,72 +8824,72 @@ def activity_ai_handoff_text(
 
     prompt_lines.extend([
         "",
-        "## Coach Understanding",
+        "## 教練理解",
         f"- 問題：{review['learning_question']}",
-        f"- Learning：{review['learning']}",
-        f"- Focus：{review['focus']}",
-        f"- Why：{review['why']}",
-        f"- Next：{review['looking_forward']}",
+        f"- 學習：{review['learning']}",
+        f"- 焦點：{review['focus']}",
+        f"- 原因：{review['why']}",
+        f"- 下一步：{review['looking_forward']}",
     ])
     if review.get("structure_note"):
-        prompt_lines.append(f"- Structure Note：{review['structure_note']}")
+        prompt_lines.append(f"- 結構說明：{review['structure_note']}")
     prompt_lines.extend([
         "",
-        "## Reasoning",
+        "## 推理",
         *cause_lines,
     ])
 
     if segment_lines:
         prompt_lines.extend([
             "",
-            "## Attention Segments",
+            "## 關鍵片段",
             *segment_lines,
         ])
 
     if context_lines:
         prompt_lines.extend([
             "",
-            "## Context",
+            "## 上下文",
             *context_lines,
         ])
 
     if include_raw_data and split_rows:
         prompt_lines.extend([
             "",
-            "## Evidence",
+            "## 證據",
             "### 完整活動資料",
             f"- Garmin Activity ID：{raw_text(activity['garmin_activity_id'])}",
-            f"- Source File：{raw_text(activity['source_file_name'])}",
-            f"- Data Source：{raw_text(activity['data_source'])}",
-            f"- Excel Schema Version：{raw_text(activity['excel_schema_version'])}",
-            f"- Recorded Duration：{raw_text(recorded_duration_text)}",
-            f"- Split Total Time：{raw_text(split_total_text)}",
-            f"- Temperature：{raw_text(temperature_text)}",
-            f"- Humidity：{raw_text(humidity_text)}",
-            f"- Wind Speed：{raw_text(wind_speed_text)}",
-            f"- Wind Direction：{raw_text(wind_direction_text)}",
-            f"- Weather：{raw_text(activity['weather_description'])}",
-            f"- Athlete Max HR Setting：{athlete_max_hr_text}",
-            f"- Activity Max HR：{activity_max_hr_text}",
-            f"- Critical Power：{raw_text(activity['critical_power_w'])}",
-            f"- Training Effect Aerobic：{raw_text(activity['training_effect_aerobic'])}",
-            f"- Training Effect Anaerobic：{raw_text(activity['training_effect_anaerobic'])}",
-            f"- Recovery Time：{raw_text(activity['recovery_time_hr'])}",
-            f"- Stamina Start：{raw_text(activity['stamina_start_pct'])}",
-            f"- Stamina End：{raw_text(activity['stamina_end_pct'])}",
-            f"- Avg Cadence：{raw_text(cadence_text)}",
-            f"- Avg Stride Length：{raw_text(stride_text)}",
-            f"- Avg GCT：{raw_text(gct_text)}",
-            f"- Avg Vertical Oscillation：{raw_text(vosc_text)}",
-            f"- Avg Vertical Ratio：{raw_text(vratio_text)}",
-            f"- Garmin Feeling：{raw_text(activity['garmin_feeling'])}",
+            f"- 來源檔案：{raw_text(activity['source_file_name'])}",
+            f"- 資料來源：{raw_text(activity['data_source'])}",
+            f"- Excel 結構版本：{raw_text(activity['excel_schema_version'])}",
+            f"- 記錄時間：{raw_text(recorded_duration_text)}",
+            f"- 分段總時間：{raw_text(split_total_text)}",
+            f"- 氣溫：{raw_text(temperature_text)}",
+            f"- 濕度：{raw_text(humidity_text)}",
+            f"- 風速：{raw_text(wind_speed_text)}",
+            f"- 風向：{raw_text(wind_direction_text)}",
+            f"- 天氣：{raw_text(activity['weather_description'])}",
+            f"- 已存活動最高心率：{stored_activity_max_hr_text}",
+            f"- 活動最高心率：{activity_max_hr_text}",
+            f"- 個人臨界功率設定：{raw_text(activity['critical_power_w'])}",
+            f"- 有氧訓練效果：{raw_text(activity['training_effect_aerobic'])}",
+            f"- 無氧訓練效果：{raw_text(activity['training_effect_anaerobic'])}",
+            f"- 恢復時間：{raw_text(activity['recovery_time_hr'])}",
+            f"- 體力起始：{raw_text(activity['stamina_start_pct'])}",
+            f"- 體力結束：{raw_text(activity['stamina_end_pct'])}",
+            f"- 平均步頻：{raw_text(cadence_text)}",
+            f"- 平均步幅：{raw_text(stride_text)}",
+            f"- 平均觸地時間：{raw_text(gct_text)}",
+            f"- 平均垂直振幅：{raw_text(vosc_text)}",
+            f"- 平均垂直比：{raw_text(vratio_text)}",
+            f"- Garmin 感受：{raw_text(activity['garmin_feeling'])}",
             f"- Garmin RPE：{raw_text(activity['garmin_perceived_effort'])}",
-            f"- Secondary Training Purpose：{raw_text(secondary_purpose_text)}",
-            f"- Nutrition：{raw_text(activity['nutrition'])}",
-            f"- Notes：{raw_text(activity['notes'])}",
+            f"- 次要訓練目的：{raw_text(secondary_purpose_text)}",
+            f"- 補給：{raw_text(activity['nutrition'])}",
+            f"- 備註：{raw_text(activity['notes'])}",
             "",
-            "### 完整每公里 split 原始資料",
-            "| 片段 | 距離 | 時間 | 配速 | Avg HR | Max HR | 功率 | 步頻 | 步幅 | GCT | 垂直比 | 垂直振幅 | 爬升 | 下降 | Stamina Start | Stamina End |",
+            "### 完整每公里分段原始資料",
+            "| 片段 | 距離 | 時間 | 配速 | 平均心率 | 最高心率 | 功率 | 步頻 | 步幅 | 觸地時間 | 垂直比 | 垂直振幅 | 爬升 | 下降 | 體力起始 | 體力結束 |",
             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         ])
         for row in split_rows:
@@ -8922,13 +8922,13 @@ def activity_ai_handoff_text(
 
     prompt_lines.extend([
         "",
-        "## Instructions",
+        "## 指示",
         "- 先講這堂課真正留下來的是什麼。",
         "- 再解釋為什麼平台會這樣判讀。",
         "- 最後只留一個下一堂課提醒。",
-        "- 如果你從原始 split 看見平台尚未明說、但值得注意的節奏或身體訊號，可以補充提出。",
-        "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據 raw data 額外補充的觀察。",
-        "- 如果 raw data 與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
+        "- 如果你從原始分段看見平台尚未明說、但值得注意的節奏或身體訊號，可以補充提出。",
+        "- 但請明確區分：哪些是平台已經判讀的，哪些是你根據原始資料額外補充的觀察。",
+        "- 如果原始資料與平台判讀有衝突，請優先指出衝突，不要直接覆蓋平台判讀。",
     ])
     prompt_lines.extend([""] + ai_handoff_response_format_instructions())
 
@@ -8969,14 +8969,14 @@ def activity_ai_handoff_panel(activity, review, split_rows, workout_split_rows=N
       <section class="panel-section" id="activity-ai-handoff">
         <h2>AI 延伸分析</h2>
         <div class="review-card ai-handoff-card">
-          <span>AI Share Handoff</span>
+          <span>AI 交棒</span>
           <strong>把這堂課的教練脈絡直接交給你習慣的 AI</strong>
           <p>如果你看完這堂課後，想沿著平台已經整理好的判讀、片段與完整活動資料繼續往下聊，這裡就是完整交棒內容。</p>
           <div class="ai-handoff-block">
             <div class="ai-handoff-block-head">
               <div>
-                <strong>完整 handoff</strong>
-                <p class="note">包含教練判讀、形成原因、關鍵片段、上下文、完整活動欄位與完整 split evidence。</p>
+                <strong>完整交棒內容</strong>
+                <p class="note">包含教練判讀、形成原因、關鍵片段、上下文、完整活動欄位與完整分段證據。</p>
               </div>
               <div class="ai-handoff-actions">
                 <button class="secondary-action" type="button" onclick="copyAiHandoff('activity-ai-handoff')">複製給 AI</button>
@@ -8990,7 +8990,7 @@ def activity_ai_handoff_panel(activity, review, split_rows, workout_split_rows=N
           <p class="note" id="activity-ai-handoff-status">先看完這堂課，再複製交給你習慣的 AI 繼續分析。</p>
         </div>
         <div class="review-card ai-handoff-card">
-          <span>Daily Training Card Prompt</span>
+          <span>每日訓練圖卡提示</span>
           <strong>把這堂課交給圖像 AI 做成每日訓練圖卡</strong>
           <p>這個 prompt 會直接帶入今日摘要、課表結構、平台判讀與關鍵片段；即使還沒先跑 AI 延伸分析，也能直接拿去做圖卡。</p>
           <div class="ai-handoff-block">
@@ -9008,7 +9008,7 @@ def activity_ai_handoff_panel(activity, review, split_rows, workout_split_rows=N
               <textarea id="activity-daily-card-prompt" readonly>{escaped_daily_card_prompt}</textarea>
             </details>
           </div>
-          <p class="note">如果你只想做一張每日訓練圖卡，直接複製這段就能用；不需要先經過完整 AI handoff。</p>
+          <p class="note">如果你只想做一張每日訓練圖卡，直接複製這段就能用；不需要先經過完整 AI 交棒。</p>
         </div>
       </section>
       {capture_panel}
@@ -9032,7 +9032,7 @@ def activity_review_panel(
     if not activity:
         return """
         <section class="panel-section">
-          <h2>Activity Summary</h2>
+          <h2>活動摘要</h2>
           <p class="note">目前還沒有活動可以建立回顧。</p>
         </section>
         """
@@ -9068,24 +9068,24 @@ def activity_review_panel(
       {activity_selector_bar(activity_rows, selected_activity_id)}
       {activity_facts_panel(activity, split_rows, workout_split_rows)}
       <section class="panel-section" id="activity-summary">
-        <h2>Activity Summary</h2>
+        <h2>活動摘要</h2>
         <div class="review-card knowledge-conversation-card activity-compact-card activity-summary-card">
-          <span>Quick Take</span>
+          <span>快速判讀</span>
           <strong>{html.escape(str(activity["activity_name"] or activity["activity_type"] or "活動"))}</strong>
           <p>{html.escape(review["focus"])}</p>
           <div class="knowledge-because">
-            <span>Why it matters</span>
+            <span>為什麼重要</span>
             <p>{html.escape(review["why"])}</p>
           </div>
         </div>
       </section>
       <section class="panel-section" id="activity-review">
-        <h2>Coach Review</h2>
+        <h2>教練判讀</h2>
         <div class="review-card knowledge-conversation-card activity-compact-card activity-review-card" id="activity-learning">
           <span>先回答一件事</span>
           <strong>{html.escape(review["learning_question"])}</strong>
           <p>{html.escape(review["learning"])}</p>
-          {'<p class="note">這次判讀先讀課表片段，再回頭核對 raw split，所以主段、恢復與收操會分開理解。</p>' if review.get("reads_workout_structure") else ''}
+          {'<p class="note">這次判讀先讀課表片段，再回頭核對原始分段，所以主段、恢復與收操會分開理解。</p>' if review.get("reads_workout_structure") else ''}
           {f'<p class="note">{html.escape(review["structure_note"])}</p>' if review.get("structure_note") else ''}
           <div class="reasoning-jump-row">
             {"".join(f'<a class="inline-jump-link" href="{html.escape(href, quote=True)}">{html.escape(label)}</a>' for label, href in review["reasoning_steps"])}
@@ -9102,14 +9102,14 @@ def activity_review_panel(
       </section>
       {activity_coach_knowledge_panel(activity, split_rows, shoe_rows, workout_rows, purpose_rows, coach_step)}
       <section class="panel-section" id="activity-evidence">
-        <h2>Evidence</h2>
+        <h2>證據</h2>
         <p class="note">{html.escape(review["evidence_intro"])}</p>
         <h3 class="subsection-title">什麼真正讓你學會了這件事？</h3>
         <div class="metric-grid training-kpi-grid briefing-evidence-grid">
           {"".join(activity_driver_card(card["title"], card["value"], card["note"], card.get("fragment_anchor"), card.get("evidence_anchor"), card.get("segment_label")) for card in review["cards"])}
         </div>
         <h3 class="subsection-title">教練看了哪些關鍵片段</h3>
-        <p class="note">先看教練停在哪幾段，再一路往下核對那一段的實際 split。</p>
+        <p class="note">先看教練停在哪幾段，再一路往下核對那一段的實際分段。</p>
         {activity_fragment_table(activity, split_rows, workout_split_rows)}
       </section>
       {activity_ai_handoff_panel(activity, review, split_rows, workout_split_rows, weekly_review, monthly_overview, saved_reply)}
@@ -9324,7 +9324,7 @@ def journey_page_panel(story, timeline_rows, turning_point_rows, available_month
               <div class="detail-chips journey-ability-chips">
                 {"".join(detail_chip("能力", ability) for ability in reflection["abilities"])}
               </div>
-              <p>Journey 記住的不是單一數字，而是你正在長出來的能力。</p>
+              <p>旅程記住的不是單一數字，而是你正在長出來的能力。</p>
             </div>
           </div>
         </div>
@@ -9405,7 +9405,7 @@ def monthly_review_panel(monthly, intelligence, progress_row, assignment_quality
 
     if knowledge_summary and knowledge_summary.get("count"):
         verdict_reason = (
-            f"{verdict_reason} 這個判讀也已經把 {knowledge_summary['count']} 堂已確認活動的 Coach Knowledge 一起納入。"
+            f"{verdict_reason} 這個判讀也已經把 {knowledge_summary['count']} 堂已確認活動的教練知識一起納入。"
         )
 
     letter = monthly_letter_payload(monthly, intelligence, verdict, phase, progress_pct)
@@ -9457,8 +9457,8 @@ def monthly_review_panel(monthly, intelligence, progress_row, assignment_quality
               <p>這個月的判讀不是單看一次表現，而是看負荷、里程、連續性與前一階段是否接得起來。</p>
             </div>
             <div class="coach-summary review-summary">
-              <span>Coach Knowledge</span>
-              <strong>{html.escape(knowledge_summary["headline"] if knowledge_summary else "這個月的 Coach Knowledge 還在累積")}</strong>
+              <span>教練知識</span>
+              <strong>{html.escape(knowledge_summary["headline"] if knowledge_summary else "這個月的教練知識還在累積")}</strong>
               <p>{html.escape(knowledge_summary["detail"] if knowledge_summary else "先讓已確認的活動慢慢堆起來，月回顧就會更容易讀懂。")}</p>
             </div>
             {monthly_coach_timeline_panel(monthly, verdict, verdict_reason, coach_memory, recommendation)}
@@ -9564,8 +9564,8 @@ def weekly_review_panel(
               <p>{html.escape(review["focus"])}</p>
             </div>
             <div class="coach-summary review-summary">
-              <span>Coach Knowledge</span>
-              <strong>{html.escape(knowledge_summary["headline"] if knowledge_summary else review["knowledge_headline"] or "這週的 Coach Knowledge 還在累積")}</strong>
+              <span>教練知識</span>
+              <strong>{html.escape(knowledge_summary["headline"] if knowledge_summary else review["knowledge_headline"] or "這週的教練知識還在累積")}</strong>
               <p>{html.escape(knowledge_summary["detail"] if knowledge_summary else review["knowledge_detail"] or "先讓已確認的活動慢慢累積起來。")}</p>
             </div>
             <div class="coach-summary review-summary">
@@ -9723,7 +9723,7 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_c
         if lowest_gct_tagged:
             insight_cards.append(
                 shoe_kpi_card(
-                    "最低標註 GCT",
+                    "最低標註觸地時間",
                     f"{format_number(lowest_gct_tagged['tagged_avg_gct_ms'], 1)} ms",
                     shoe_display_name(lowest_gct_tagged),
                 )
@@ -9913,7 +9913,7 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_c
           <div class="weekly-review-side">
             <div class="review-card">
               <span>新增後會影響</span>
-              <strong>Activity / Weekly / Monthly</strong>
+              <strong>活動 / 週回顧 / 月回顧</strong>
               <p>鞋款補齊後，單堂課、週回顧與鞋款頁的判讀都會更完整。</p>
             </div>
             <div class="review-card">
@@ -10019,7 +10019,7 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_c
                 <th>平均心率</th>
                 <th>平均負荷</th>
                 <th>步頻</th>
-                <th>GCT</th>
+                <th>觸地時間</th>
                 <th>步幅</th>
               </tr>
             </thead>
@@ -10708,7 +10708,7 @@ def metadata_page_panel(
     elif scope == "all":
         helper_text = "這裡適合回頭校正最近活動；如果想省力，先切回上面的缺項範圍。"
     elif scope == "complete":
-        helper_text = "這一批已經可直接支援更深的週 / 月 / Journey 判讀。"
+        helper_text = "這一批已經可直接支援更深的週 / 月 / 旅程判讀。"
 
     prev_link = ""
     next_link = ""
@@ -13405,15 +13405,15 @@ def base_styles():
 
 def page_hero(page):
     page_labels = {
-        "home": ("Today Focus", "今天先看恢復", "先把恢復顧好，再看本週真正留下了什麼。"),
-        "activity": ("Activity", "這堂課留下了什麼", "把單次活動整理成可理解的回顧。"),
-        "weekly": ("Weekly", "這週留下了什麼", "先看本週狀態，再看下一步。"),
-        "monthly": ("Monthly", "現在走到哪裡", "用月度節奏看趨勢與轉折。"),
-        "journey": ("Journey", "時間怎麼串起來", "把每個月串成一段旅程。"),
-        "shoes": ("Shoes", "鞋款如何分工", "讓鞋款資訊變成決策。"),
-        "training": ("Training", "訓練結構", "先看結構，再看缺口。"),
-        "metadata": ("Annotation", "今天要補哪些標註", "把活動補齊，讓系統更誠實。"),
-        "settings": ("Settings", "今天調哪些設定", "把字典與對照集中在同一處。"),
+        "home": ("今日焦點", "今天先看恢復", "先把恢復顧好，再看本週真正留下了什麼。"),
+        "activity": ("活動", "這堂課留下了什麼", "把單次活動整理成可理解的回顧。"),
+        "weekly": ("週回顧", "這週留下了什麼", "先看本週狀態，再看下一步。"),
+        "monthly": ("月回顧", "現在走到哪裡", "用月度節奏看趨勢與轉折。"),
+        "journey": ("訓練旅程", "時間怎麼串起來", "把每個月串成一段旅程。"),
+        "shoes": ("鞋款", "鞋款如何分工", "讓鞋款資訊變成決策。"),
+        "training": ("訓練結構", "訓練結構", "先看結構，再看缺口。"),
+        "metadata": ("標註", "今天要補哪些標註", "把活動補齊，讓系統更誠實。"),
+        "settings": ("設定", "今天調哪些設定", "把字典與對照集中在同一處。"),
     }
     page_slug, page_title, page_hint = page_labels.get(page, page_labels["home"])
     cta_map = {

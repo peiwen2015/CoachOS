@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS activity (
 
     max_hr INTEGER CHECK (max_hr IS NULL OR max_hr BETWEEN 30 AND 240),
     avg_hr INTEGER CHECK (avg_hr IS NULL OR avg_hr BETWEEN 30 AND 240),
+    avg_power_w INTEGER CHECK (avg_power_w IS NULL OR avg_power_w >= 0),
     critical_power_w INTEGER CHECK (critical_power_w IS NULL OR critical_power_w > 0),
     training_effect_aerobic REAL CHECK (
         training_effect_aerobic IS NULL OR training_effect_aerobic BETWEEN 0 AND 5

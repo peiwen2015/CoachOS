@@ -797,7 +797,7 @@ def activity_daily_training_card_prompt(
     pace_text = format_pace_seconds(activity["avg_pace_sec_per_km"]) or "—"
     hr_text = "" if activity["avg_hr"] is None else str(int(round(activity["avg_hr"])))
     power_value = activity_value("avg_power_w")
-    power_text = "" if power_value is None else format_number(power_value, 0)
+    power_text = format_power_text(power_value)
     load_text = format_number(activity["training_load"], 0) or "—"
     recovery_text = raw_text(activity["recovery_time_hr"])
     cause_lines = [f"- {card['title']}：{card['value']}；{card['note']}" for card in review.get("cards", [])]
@@ -836,6 +836,7 @@ def activity_daily_training_card_prompt(
         "- 若課表片段表存在，請先用它理解主體課程，再用原始分段補證據。",
         "- 不要把 warm-up、recovery、stride、cool-down 誤寫成今天的主體刺激。",
         "- 最後請補一行適合放在卡片底部的收尾句。",
+        "- 平均功率只接受活動層級的官方欄位；如果那一欄是未提供，即使每公里分段有功率，也不要自行代算成官方平均功率。",
         "",
         "## 今日摘要",
         f"- 標題：今日跑步分析",
@@ -843,7 +844,8 @@ def activity_daily_training_card_prompt(
         f"- 地點：{location_text}",
         f"- 鞋款：{shoe_text}",
         f"- 課表類型 / 訓練目的：{workout_text} / {purpose_text}",
-        f"- 核心數據：距離 {activity_distance_text}，時間 {duration_text}，平均配速 {pace_text}，平均心率 {hr_text or '—'}，平均功率 {power_text or '—'}，訓練負荷 {load_text}，恢復時間 {recovery_text}",
+        f"- 核心數據：距離 {activity_distance_text}，時間 {duration_text}，平均配速 {pace_text}",
+        f"- 核心數據：平均心率 {hr_text or '—'}，平均功率 {power_text}，訓練負荷 {load_text}，恢復時間 {recovery_text}",
         "",
         "## 平台已整理的教練判讀",
         f"- 這堂課先回答的問題：{review.get('learning_question', '—')}",
@@ -1256,6 +1258,15 @@ def format_number(value, digits=1):
     if number.is_integer():
         return str(int(number))
     return f"{number:.{digits}f}"
+
+
+def format_power_text(value, fallback="未提供"):
+    if value_is_blank(value):
+        return fallback
+    try:
+        return f"{format_number(value, 0)} W"
+    except Exception:
+        return fallback
 
 
 def format_delta_pct(value):
@@ -2260,10 +2271,16 @@ def ensure_activity_gps_columns(connection):
         row[1]
         for row in connection.execute("PRAGMA table_info(activity)").fetchall()
     }
-    for column_name in ("start_latitude", "start_longitude", "end_latitude", "end_longitude"):
+    for column_name, column_type in (
+        ("avg_power_w", "INTEGER"),
+        ("start_latitude", "REAL"),
+        ("start_longitude", "REAL"),
+        ("end_latitude", "REAL"),
+        ("end_longitude", "REAL"),
+    ):
         if column_name in existing_columns:
             continue
-        connection.execute(f"ALTER TABLE activity ADD COLUMN {column_name} REAL")
+        connection.execute(f"ALTER TABLE activity ADD COLUMN {column_name} {column_type}")
 
 
 def provenance_source_label(source):
@@ -3308,6 +3325,12 @@ def activity_focus_segment_labels(activity, focus_rows, all_rows, workout_split_
             "middle": "中段反應",
             "finish": "收尾狀態",
         }
+    if is_continuous_run_workout(workout_split_rows or []):
+        return {
+            "start": "連續跑步起點",
+            "middle": "連續跑步中段",
+            "finish": "連續跑步收尾",
+        }
     if structured_focus_splits(all_rows, workout_split_rows or []):
         return {
             "start": "主段起點",
@@ -3452,6 +3475,7 @@ def activity_review_payload(activity, split_rows, workout_split_rows=None):
         stamina_drop = float(stamina_start) - float(stamina_end)
     structured_focus = structured_focus_splits(split_rows, workout_split_rows or [])
     structured_active_rows = structured_active_segment_rows(workout_split_rows or [])
+    continuous_run = is_continuous_run_workout(workout_split_rows or [])
     has_structured_recovery = any(
         workout_segment_kind(row) == "recovery" for row in (workout_split_rows or [])
     )
@@ -3542,9 +3566,13 @@ def activity_review_payload(activity, split_rows, workout_split_rows=None):
                     active_change = pace_change
                 if active_change is not None:
                     segment_scope = (
-                        "第一組主段到最後一組主段"
-                        if len(structured_active_rows) >= 2 and has_structured_recovery
-                        else "主段前段到主段後段"
+                        "第一組連續跑步到最後一組連續跑步"
+                        if continuous_run
+                        else (
+                            "第一組主段到最後一組主段"
+                            if len(structured_active_rows) >= 2 and has_structured_recovery
+                            else "主段前段到主段後段"
+                        )
                     )
                     pace_note = (
                         f"{segment_scope}約慢了 {format_number(abs(active_change), 0)} 秒。{trailing_note}".strip()
@@ -3568,7 +3596,11 @@ def activity_review_payload(activity, split_rows, workout_split_rows=None):
             "note": pace_note,
             "fragment_anchor": "#fragment-finish",
             "evidence_anchor": f"#split-{last_split_index}" if last_split_index is not None else "#activity-evidence",
-            "segment_label": "主段收尾" if structured_focus else ("主體收尾" if focus_rows and len(focus_rows) != len(activity_analysis_splits(split_rows)) else "收尾狀態"),
+            "segment_label": (
+                "連續跑步收尾"
+                if continuous_run
+                else ("主段收尾" if structured_focus else ("主體收尾" if focus_rows and len(focus_rows) != len(activity_analysis_splits(split_rows)) else "收尾狀態"))
+            ),
         })
 
     if training_load:
@@ -3591,7 +3623,11 @@ def activity_review_payload(activity, split_rows, workout_split_rows=None):
             "note": load_note,
             "fragment_anchor": "#fragment-middle",
             "evidence_anchor": f"#split-{middle_split_index}" if middle_split_index is not None else "#activity-evidence",
-            "segment_label": "主段中段" if structured_focus else ("主體中段" if focus_rows and len(focus_rows) != len(activity_analysis_splits(split_rows)) else "中段反應"),
+            "segment_label": (
+                "連續跑步中段"
+                if continuous_run
+                else ("主段中段" if structured_focus else ("主體中段" if focus_rows and len(focus_rows) != len(activity_analysis_splits(split_rows)) else "中段反應"))
+            ),
         })
 
     if is_hot or stamina_drop is not None or hr_change is not None:
@@ -3618,7 +3654,11 @@ def activity_review_payload(activity, split_rows, workout_split_rows=None):
             "note": body_note,
             "fragment_anchor": "#fragment-middle",
             "evidence_anchor": f"#split-{middle_split_index}" if middle_split_index is not None else "#activity-evidence",
-            "segment_label": "主段中段" if structured_focus else ("主體中段" if focus_rows and len(focus_rows) != len(activity_analysis_splits(split_rows)) else "中段反應"),
+            "segment_label": (
+                "連續跑步中段"
+                if continuous_run
+                else ("主段中段" if structured_focus else ("主體中段" if focus_rows and len(focus_rows) != len(activity_analysis_splits(split_rows)) else "中段反應"))
+            ),
         })
 
     evidence_intro = "我會這樣看，不是因為單一數字，而是因為這堂課的節奏、刺激與身體回應指向同一個學習。"
@@ -3626,6 +3666,8 @@ def activity_review_payload(activity, split_rows, workout_split_rows=None):
     if displayed_workout_rows:
         if easy_run and has_short_active_segments:
             structure_note = "這堂課的主體先看 easy 段，課尾另有短加速與恢復片段，所以主體判讀不會把 stride 混進來。"
+        elif continuous_run:
+            structure_note = "這堂課只有一段連續跑步，所以判讀會直接把它當成完整跑步，不會硬拆成主段。"
         elif has_structured_recovery and len(structured_active_rows) >= 2:
             structure_note = "這堂課有明確主段與恢復切分，所以判讀會先按課表結構理解，再回頭核對原始分段。"
         elif structured_focus:
@@ -4185,8 +4227,13 @@ def selected_month_key_sessions(connection, month_key=None):
     target_month = selected_month_summary(connection, month_key)
     if not target_month:
         return []
+    existing_columns = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(activity_review_view)").fetchall()
+    }
+    avg_power_select = "avg_power_w" if "avg_power_w" in existing_columns else "NULL AS avg_power_w"
     return connection.execute(
-        """
+        f"""
         WITH current_rows AS (
             SELECT *
             FROM activity_review_view
@@ -4239,6 +4286,7 @@ def selected_month_key_sessions(connection, month_key=None):
             distance_km,
             avg_pace_sec_per_km,
             avg_hr,
+            {avg_power_select},
             training_load,
             shoe_display_name,
             workout_type_name_en
@@ -4252,8 +4300,13 @@ def selected_week_key_sessions(connection, week_offset=None):
     target_week = selected_week_summary(connection, week_offset)
     if not target_week:
         return []
+    existing_columns = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(activity_review_view)").fetchall()
+    }
+    avg_power_select = "avg_power_w" if "avg_power_w" in existing_columns else "NULL AS avg_power_w"
     return connection.execute(
-        """
+        f"""
         WITH current_rows AS (
             SELECT *
             FROM activity_review_view
@@ -4306,6 +4359,7 @@ def selected_week_key_sessions(connection, week_offset=None):
             distance_km,
             avg_pace_sec_per_km,
             avg_hr,
+            {avg_power_select},
             training_load,
             shoe_display_name,
             workout_type_name_en
@@ -5357,9 +5411,13 @@ def available_activities(connection, limit=500):
 
 
 def selected_activity(connection, activity_id):
+    existing_columns = {
+        row[1]
+        for row in connection.execute("PRAGMA table_info(activity)").fetchall()
+    }
+    avg_power_select = "activity.avg_power_w" if "avg_power_w" in existing_columns else "NULL AS avg_power_w"
     if activity_id:
-        row = connection.execute(
-            """
+        query = f"""
             SELECT
                 review.activity_id,
                 activity.garmin_activity_id,
@@ -5408,6 +5466,7 @@ def selected_activity(connection, activity_id):
                 review.end_latitude,
                 review.end_longitude,
                 activity.critical_power_w,
+                {avg_power_select},
                 review.nutrition,
                 review.notes,
                 review.garmin_feeling,
@@ -5416,13 +5475,14 @@ def selected_activity(connection, activity_id):
             JOIN activity
               ON activity.id = review.activity_id
             WHERE review.activity_id = ?
-            """,
+        """
+        row = connection.execute(
+            query,
             (activity_id,),
         ).fetchone()
         if row:
             return row
-    return connection.execute(
-        """
+    query = f"""
         SELECT
             review.activity_id,
             activity.garmin_activity_id,
@@ -5471,6 +5531,7 @@ def selected_activity(connection, activity_id):
             review.end_latitude,
             review.end_longitude,
             activity.critical_power_w,
+            {avg_power_select},
             review.nutrition,
             review.notes,
             review.garmin_feeling,
@@ -5480,7 +5541,9 @@ def selected_activity(connection, activity_id):
           ON activity.id = review.activity_id
         ORDER BY review.activity_start_time DESC
         LIMIT 1
-        """
+    """
+    return connection.execute(
+        query
     ).fetchone()
 
 
@@ -6991,6 +7054,7 @@ def weekly_ai_handoff_text(
         key = str(row["key_session_type"])
         group_key = row["activity_id"]
         if group_key not in grouped_sessions:
+            power_value = row["avg_power_w"] if "avg_power_w" in row.keys() else None
             grouped_sessions[group_key] = {
                 "activity": str(row["activity_name"] or row["activity_type"] or "活動"),
                 "date": format_short_datetime(row["activity_start_time"]),
@@ -6998,6 +7062,7 @@ def weekly_ai_handoff_text(
                 "distance": format_number(row["distance_km"], 2) or "—",
                 "pace": format_pace_seconds(row["avg_pace_sec_per_km"]) or "—",
                 "hr": "" if row["avg_hr"] is None else int(round(row["avg_hr"])),
+                "power": format_power_text(power_value),
                 "load": format_number(row["training_load"], 1) or "—",
                 "shoe": str(row["shoe_display_name"] or "未標註"),
                 "labels": [],
@@ -7011,7 +7076,7 @@ def weekly_ai_handoff_text(
     key_session_lines = []
     for session in grouped_sessions.values():
         key_session_lines.append(
-            "- {labels}：{activity}；{date}；{workout}；{distance} km；配速 {pace}；HR {hr}；負荷 {load}；鞋款 {shoe}；Reasons：{reasons}".format(
+            "- {labels}：{activity}；{date}；{workout}；{distance} km；配速 {pace}；HR {hr}；功率 {power}；負荷 {load}；鞋款 {shoe}；Reasons：{reasons}".format(
                 labels=" / ".join(session["labels"]),
                 activity=session["activity"],
                 date=session["date"],
@@ -7019,6 +7084,7 @@ def weekly_ai_handoff_text(
                 distance=session["distance"],
                 pace=session["pace"],
                 hr=session["hr"],
+                power=session["power"],
                 load=session["load"],
                 shoe=session["shoe"],
                 reasons=" / ".join(session["reasons"]),
@@ -7358,6 +7424,7 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
         key = str(row["key_session_type"])
         group_key = row["activity_id"]
         if group_key not in grouped_sessions:
+            power_value = row["avg_power_w"] if "avg_power_w" in row.keys() else None
             grouped_sessions[group_key] = {
                 "activity": str(row["activity_name"] or row["activity_type"] or "活動"),
                 "date": format_short_datetime(row["activity_start_time"]),
@@ -7365,6 +7432,7 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
                 "distance": format_number(row["distance_km"], 2) or "—",
                 "pace": format_pace_seconds(row["avg_pace_sec_per_km"]) or "—",
                 "hr": "" if row["avg_hr"] is None else int(round(row["avg_hr"])),
+                "power": format_power_text(power_value),
                 "load": format_number(row["training_load"], 1) or "—",
                 "shoe": str(row["shoe_display_name"] or "未標註"),
                 "labels": [],
@@ -7378,7 +7446,7 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
     key_session_lines = []
     for session in grouped_sessions.values():
         key_session_lines.append(
-            "- {labels}：{activity}；{date}；{workout}；{distance} km；配速 {pace}；HR {hr}；負荷 {load}；鞋款 {shoe}；Reasons：{reasons}".format(
+            "- {labels}：{activity}；{date}；{workout}；{distance} km；配速 {pace}；HR {hr}；功率 {power}；負荷 {load}；鞋款 {shoe}；Reasons：{reasons}".format(
                 labels=" / ".join(session["labels"]),
                 activity=session["activity"],
                 date=session["date"],
@@ -7386,6 +7454,7 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
                 distance=session["distance"],
                 pace=session["pace"],
                 hr=session["hr"],
+                power=session["power"],
                 load=session["load"],
                 shoe=session["shoe"],
                 reasons=" / ".join(session["reasons"]),
@@ -7719,6 +7788,7 @@ def activity_key_segments(activity, split_rows, workout_split_rows=None):
     if not analysis_rows:
         return []
     labels = activity_focus_segment_labels(activity, analysis_rows, all_rows, workout_split_rows)
+    continuous_run = is_continuous_run_workout(workout_split_rows or [])
     rows = []
     first = analysis_rows[0]
     last = analysis_rows[-1]
@@ -7727,7 +7797,7 @@ def activity_key_segments(activity, split_rows, workout_split_rows=None):
         "label": labels["start"],
         "section": structured_segment_label_for_split(first, split_rows, workout_split_rows or []),
         "metric": f"配速 {format_pace_seconds(first['elapsed_pace_sec_per_km']) or '—'} · HR {'' if first['avg_hr'] is None else int(round(first['avg_hr']))}",
-        "note": "先看這堂課是怎麼進入今天真正要訓練的主體。",
+        "note": "先看這段連續跑步是怎麼進入今天真正要訓練的節奏。" if continuous_run else "先看這堂課是怎麼進入今天真正要訓練的主體。",
         "split_anchor": f"split-{first['split_index']}",
     })
     if len(analysis_rows) >= 3:
@@ -7745,7 +7815,7 @@ def activity_key_segments(activity, split_rows, workout_split_rows=None):
         "label": labels["finish"],
         "section": structured_segment_label_for_split(last, split_rows, workout_split_rows or []),
         "metric": f"配速 {format_pace_seconds(last['elapsed_pace_sec_per_km']) or '—'} · HR {'' if last['avg_hr'] is None else int(round(last['avg_hr']))}",
-        "note": "這一段最能看出今天主體刺激最後有沒有被守住。",
+        "note": "這一段最能看出今天這段連續跑步最後有沒有被守住。" if continuous_run else "這一段最能看出今天主體刺激最後有沒有被守住。",
         "split_anchor": f"split-{last['split_index']}",
     })
     return rows
@@ -7961,7 +8031,7 @@ def activity_facts_panel(activity, split_rows=None, workout_split_rows=None):
     power_group = raw_data_group(
         "功率",
         [
-            raw_data_row("平均功率", "" if avg_split_power is None else f"{format_number(avg_split_power, 0)} W"),
+            raw_data_row("每公里分段平均功率", "" if avg_split_power is None else f"{format_number(avg_split_power, 0)} W"),
             raw_data_row("最大功率", "" if max_split_power is None else f"{format_number(max_split_power, 0)} W"),
             raw_data_row("個人臨界功率", "" if activity["critical_power_w"] is None else f"{format_number(activity['critical_power_w'], 0)} W"),
         ],
@@ -8637,6 +8707,13 @@ def structured_active_segment_rows(workout_split_rows):
     return [item[0] for item in structured_focus_workout_segments(workout_split_rows) if workout_segment_kind(item[0]) == "active"]
 
 
+def is_continuous_run_workout(workout_split_rows):
+    rows = display_workout_splits(workout_split_rows or [])
+    if len(rows) != 1:
+        return False
+    return workout_display_label(rows[0], workout_split_rows or []) == "連續跑步"
+
+
 def workout_segment_overlap(split_start, split_end, segment_start, segment_end):
     return max(0.0, min(split_end, segment_end) - max(split_start, segment_start))
 
@@ -8763,6 +8840,13 @@ def activity_ai_handoff_text(
         text = str(value).strip()
         return text if text else fallback
 
+    def activity_value(key, fallback=None):
+        try:
+            value = activity[key]
+        except (KeyError, IndexError, TypeError):
+            return fallback
+        return fallback if value is None else value
+
     temperature_text = f"{format_number(activity['temperature_c'], 0)}°C" if activity["temperature_c"] is not None else None
     humidity_text = f"{format_number(activity['humidity_pct'], 0)}%" if activity["humidity_pct"] is not None else None
     wind_speed_text = format_number(activity["wind_speed_mps"], 1) if activity["wind_speed_mps"] is not None else None
@@ -8830,6 +8914,7 @@ def activity_ai_handoff_text(
             [
                 "不要只看配速，必須整合心率、功率、跑姿、體力、天氣與課表目的。",
                 "若資料不足，明確說明不足處，不要硬推論。",
+                "平均功率只認活動層級的官方欄位；如果欄位未提供，即使分段有功率，也不要自行代算成活動平均功率。",
             ],
         )
     )
@@ -8843,6 +8928,7 @@ def activity_ai_handoff_text(
         f"- 負荷：{load_text}",
         f"- 平均配速：{pace_text}",
         f"- 平均心率：{hr_text}",
+        f"- 平均功率：{format_power_text(activity_value('avg_power_w'))}",
         f"- 鞋款：{shoe_text}",
         f"- 主要目的：{purpose_text}",
     ])

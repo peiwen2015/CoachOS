@@ -40,7 +40,12 @@ from fit_to_excel import (
     weighted_average,
     write_fit_to_sqlite,
 )
-from repair_hr_artifacts import backfill_sqlite_activity_max_hr, repair_excel_workbooks
+from repair_hr_artifacts import (
+    backfill_sqlite_activity_avg_power,
+    backfill_sqlite_activity_name,
+    backfill_sqlite_activity_max_hr,
+    repair_excel_workbooks,
+)
 from analysis_platform.wsi_engine import ensure_activity_wsi_table, recompute_all_activity_wsi
 
 
@@ -211,6 +216,9 @@ def workbook_summary(path):
         for row in rows
         if isinstance(row[8], (int, float)) and isinstance(row[2], (int, float))
     ]
+    avg_power_text = info.get("平均功率") or info.get("Average Power") or (
+        f"{weighted_average(avg_power_pairs, 1)} W" if avg_power_pairs else ""
+    )
 
     summary = [
         ("活動日期", info.get("活動日期")),
@@ -219,7 +227,7 @@ def workbook_summary(path):
         ("時間", format_duration(total_seconds)),
         ("平均配速", pace_text(total_seconds, total_distance)),
         ("平均心率", weighted_average(avg_hr_pairs, 1) if avg_hr_pairs else ""),
-        ("平均功率", f"{weighted_average(avg_power_pairs, 1)} W" if avg_power_pairs else ""),
+        ("平均功率", avg_power_text),
         ("課表結構", workbook_workout_structure_label(wb)),
         ("天氣", weather_summary(info)),
         ("訓練效果", training_effect_summary(info)),
@@ -1039,13 +1047,15 @@ def batch_convert_result_html(job, job_id=""):
 def hr_repair_result_html(job, job_id=""):
     result = job.get("result") or {}
     month = html.escape(job.get("month", ""))
-    sqlite_updates = int(result.get("sqlite_updates", 0) or 0)
+    sqlite_max_hr_updates = int(result.get("sqlite_max_hr_updates", 0) or 0)
+    sqlite_avg_power_updates = int(result.get("sqlite_avg_power_updates", 0) or 0)
     excel_scanned = int(result.get("excel_scanned", 0) or 0)
     excel_updated = int(result.get("excel_updated", 0) or 0)
     output_dir = DEFAULT_OUTPUT_DIR / job.get("month", "")
     parts = [
-        f"{month} 心率與臨界功率修補完成。<br>",
-        f"SQLite 更新：<code>{sqlite_updates}</code> 筆<br>",
+        f"{month} 心率與平均功率修補完成。<br>",
+        f"SQLite 最高心率更新：<code>{sqlite_max_hr_updates}</code> 筆<br>",
+        f"SQLite 平均功率更新：<code>{sqlite_avg_power_updates}</code> 筆<br>",
         f"Excel 更新：<code>{excel_updated}</code> / <code>{excel_scanned}</code> 份<br>",
         f"月份資料夾：<code>{html.escape(str(output_dir))}</code><br>",
     ]
@@ -1598,16 +1608,23 @@ def run_safe_refresh_job(job_id, month, fetch_weather):
     for index, row in enumerate(targets, start=1):
         update_batch_job(job_id, current=index - 1, message=f"安全重轉中：{row['fit']}")
         try:
+            output_path = Path(row["output_path"])
+            metadata = {}
+            if output_path.exists():
+                try:
+                    metadata = load_activity_info_values(output_path)
+                except Exception:
+                    metadata = {}
             saved = create_workbook(
                 row["fit_path"],
-                row["output_path"],
-                metadata={},
+                output_path,
+                metadata=metadata,
                 fetch_weather=fetch_weather,
             )
             sqlite_result = refresh_sqlite_gps_and_workout_structure(
                 row["fit_path"],
                 SQLITE_DB_PATH,
-                metadata={},
+                metadata=metadata,
                 fetch_weather=fetch_weather,
             )
             sqlite_note = ""
@@ -1630,17 +1647,23 @@ def run_safe_refresh_job(job_id, month, fetch_weather):
 
 
 def run_hr_repair_job(job_id, month):
-    update_batch_job(job_id, total=2, current=0, message=f"正在修補 {month} 的 SQLite 活動最高心率...")
-    sqlite_updates = backfill_sqlite_activity_max_hr(SQLITE_DB_PATH, month)
-    update_batch_job(job_id, current=1, message=f"正在修補 {month} 的 Excel 標籤與活動最高心率...")
-    excel_scanned, excel_updated = repair_excel_workbooks(DEFAULT_OUTPUT_DIR, SQLITE_DB_PATH, month)
+    update_batch_job(job_id, total=4, current=0, message=f"正在修補 {month} 的 SQLite 活動名稱...")
+    sqlite_name_updates = backfill_sqlite_activity_name(SQLITE_DB_PATH, FIT_DIR, month)
+    update_batch_job(job_id, current=1, message=f"正在修補 {month} 的 SQLite 活動最高心率...")
+    sqlite_max_hr_updates = backfill_sqlite_activity_max_hr(SQLITE_DB_PATH, month)
+    update_batch_job(job_id, current=2, message=f"正在修補 {month} 的 SQLite 平均功率...")
+    sqlite_avg_power_updates = backfill_sqlite_activity_avg_power(SQLITE_DB_PATH, FIT_DIR, month)
+    update_batch_job(job_id, current=3, message=f"正在修補 {month} 的 Excel 標籤與活動資料...")
+    excel_scanned, excel_updated = repair_excel_workbooks(DEFAULT_OUTPUT_DIR, SQLITE_DB_PATH, FIT_DIR, month)
     update_batch_job(
         job_id,
         status="done",
-        current=2,
-        total=2,
+        current=4,
+        total=4,
         result={
-            "sqlite_updates": sqlite_updates,
+            "sqlite_name_updates": sqlite_name_updates,
+            "sqlite_max_hr_updates": sqlite_max_hr_updates,
+            "sqlite_avg_power_updates": sqlite_avg_power_updates,
             "excel_scanned": excel_scanned,
             "excel_updated": excel_updated,
         },
@@ -2922,7 +2945,7 @@ def render_batch_convert_page(message="", error="", selected_month=""):
       <input type="hidden" name="fetch_weather" value="1">
       <fieldset>
         <legend>快速動作</legend>
-        <p class="note">如果這個月的 Excel 需要套用新格式，例如補上課表結構、修正欄位或圖表，直接用這裡安全重轉就好。這條路只會重做 Excel，並補 SQLite 的 GPS / 課表結構；不會覆蓋原本 SQLite 裡已標註的鞋款、課表種類、訓練目的與其他手動資料。</p>
+        <p class="note">如果這個月的 Excel 需要套用新格式，例如補上課表結構、修正欄位或圖表，直接用這裡安全重轉就好。這條路只會重做 Excel，並補 SQLite 的 GPS / 課表結構；而且會沿用既有 Excel 的活動資訊，不會覆蓋原本已標註的鞋款、課表種類、訓練目的與其他手動資料。</p>
       </fieldset>
       <div class="actions">
         <button type="submit">整月安全重轉</button>
@@ -2932,7 +2955,7 @@ def render_batch_convert_page(message="", error="", selected_month=""):
       <input type="hidden" name="month" value="{html.escape(selected_month, quote=True)}">
       <fieldset>
         <legend>修補既有 Excel / SQLite</legend>
-        <p class="note">這裡會修正既有資料中的心率與訓練指標標籤：SQLite 會把活動最高心率回補成真實活動值，Excel 會把「最大心率」改成「個人最大心率」、補上「活動最高心率」、把 Critical Power 改成「個人臨界功率」，並把訓練效果、訓練負荷、恢復時間與體力欄位統一成中文。</p>
+        <p class="note">這裡會修正既有資料中的心率與平均功率、訓練指標標籤：SQLite 會把活動最高心率與平均功率回補成真實活動值，Excel 會把「最大心率」改成「個人最大心率」、補上「活動最高心率」與「平均功率」、把 Critical Power 改成「個人臨界功率」，並把訓練效果、訓練負荷、恢復時間與體力欄位統一成中文。</p>
       </fieldset>
       <div class="actions">
         <button type="submit">修補這個月的既有資料</button>

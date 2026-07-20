@@ -21,7 +21,7 @@ from openpyxl.utils import get_column_letter
 
 
 FIT_EPOCH = 631065600
-APP_VERSION = "1.4.0"
+APP_VERSION = "1.4.1"
 WORKBOOK_VERSION_NAME = "跑步分析資料 v1.1"
 DEFAULT_OUTPUT_DIR = Path(__file__).resolve().parent / "EXCEL"
 CONFIG_DIR = Path(__file__).resolve().parent / "config"
@@ -1184,13 +1184,21 @@ def activity_type(session):
     return " / ".join(values)
 
 
-def activity_name(session, metadata):
+def fit_workout_name(messages):
+    workout_messages = messages.get("workout_mesgs", []) if messages else []
+    workout = workout_messages[0] if workout_messages else {}
+    return fit_text_value(workout.get("wkt_name"))
+
+
+def activity_name(session, metadata, workout_name=None):
     if metadata.get("activity_name") not in ("", None):
         return metadata.get("activity_name")
     for key in ("activity_name", "name", "workout_name", "title"):
         value = session.get(key)
         if value not in ("", None):
             return value
+    if workout_name not in ("", None):
+        return workout_name
     return ""
 
 
@@ -1236,13 +1244,16 @@ def wind_speed_mps(value):
     return round(speed, 2)
 
 
-def activity_summary(rows):
+def activity_summary(rows, session=None):
+    session = session or {}
     total_distance = sum(row[1] for row in rows if isinstance(row[1], (int, float)))
     total_seconds = sum(row[2] for row in rows if isinstance(row[2], (int, float)))
+    avg_power = first_number(session, "avg_power")
     return {
         "distance_km": round(total_distance / 1000, 2) if total_distance else "",
         "duration": duration_text(total_seconds),
         "avg_pace": pace_text(total_seconds, total_distance) if total_distance and total_seconds else "",
+        "avg_power": rounded(avg_power, 1) if isinstance(avg_power, (int, float)) else "",
     }
 
 
@@ -1362,7 +1373,7 @@ def add_options_sheet(wb, dropdown_options):
     return ws
 
 
-def add_metadata_sheet(wb, metadata, fit_path, session, rows, records, dropdown_options):
+def add_metadata_sheet(wb, metadata, fit_path, session, workout_name, rows, records, dropdown_options):
     metadata = coerce_metadata(metadata)
     if metadata.get("rpe", "") == "":
         metadata["rpe"] = garmin_rpe_label(session.get("workout_rpe"), dropdown_options["garmin_rpe"])
@@ -1387,7 +1398,7 @@ def add_metadata_sheet(wb, metadata, fit_path, session, rows, records, dropdown_
 
     start = fit_datetime(session.get("start_time") or session.get("timestamp"))
     gps = activity_gps_points(session, records)
-    activity = activity_summary(rows)
+    activity = activity_summary(rows, session)
     economy = running_economy_summary(rows, session)
     stamina_start, stamina_end = stamina_summary(rows)
     activity_max_hr = int_or_none(first_number(session, "max_heart_rate"))
@@ -1414,10 +1425,11 @@ def add_metadata_sheet(wb, metadata, fit_path, session, rows, records, dropdown_
                 ("活動日期", activity_date(session, fit_path), "activity_date"),
                 ("開始時間", start.astimezone().strftime("%H:%M:%S") if start else "", "start_time"),
                 ("活動類型", activity_type(session), "activity_type"),
-                ("活動名稱", activity_name(session, metadata), "activity_name"),
+                ("活動名稱", activity_name(session, metadata, workout_name), "activity_name"),
                 ("距離 (km)", activity["distance_km"], "distance_km"),
                 ("時間", activity["duration"], "duration"),
                 ("平均配速", activity["avg_pace"], "avg_pace"),
+                ("平均功率", f"{activity['avg_power']} W" if activity["avg_power"] != "" else "", "avg_power"),
                 ("課表類型", metadata.get("workout_type", ""), "workout_type"),
                 ("訓練目的", metadata.get("training_focus", ""), "training_focus"),
                 ("鞋款", metadata.get("shoe", ""), "shoe"),
@@ -1780,7 +1792,7 @@ def sqlite_activity_row(fit_path, messages, session, rows, metadata):
         "data_source": "FIT",
         "activity_start_time": activity_start_iso(session),
         "activity_type": activity_type(session),
-        "activity_name": null_if_blank(activity_name(session, metadata)),
+        "activity_name": null_if_blank(activity_name(session, metadata, fit_workout_name(messages))),
         "distance_km": round(float(total_distance_m) / 1000, 3) if total_distance_m else None,
         "duration_sec": int_or_none(total_seconds),
         "workout_type_id": None,
@@ -1792,6 +1804,7 @@ def sqlite_activity_row(fit_path, messages, session, rows, metadata):
         "weather_description": null_if_blank(metadata.get("weather_description")),
         "max_hr": activity_max_hr,
         "avg_hr": int_or_none(first_number(session, "avg_heart_rate") or weighted_average(((row[4], row[2]) for row in rows), 1)),
+        "avg_power_w": int_or_none(first_number(session, "avg_power")),
         "critical_power_w": int_or_none(metadata.get("critical_power")),
         "training_effect_aerobic": float_or_none(metadata.get("training_effect_aerobic")),
         "training_effect_anaerobic": float_or_none(metadata.get("training_effect_anaerobic")),
@@ -2066,10 +2079,11 @@ def ensure_activity_gps_columns(connection):
         row[1]
         for row in connection.execute("PRAGMA table_info(activity)").fetchall()
     }
-    for column_name in ("start_latitude", "start_longitude", "end_latitude", "end_longitude"):
+    for column_name in ("avg_power_w", "start_latitude", "start_longitude", "end_latitude", "end_longitude"):
         if column_name in existing_columns:
             continue
-        connection.execute(f"ALTER TABLE activity ADD COLUMN {column_name} REAL")
+        column_type = "INTEGER" if column_name == "avg_power_w" else "REAL"
+        connection.execute(f"ALTER TABLE activity ADD COLUMN {column_name} {column_type}")
 
 
 def ensure_dropdown_source_table(connection, dropdown_options):
@@ -2437,6 +2451,7 @@ def refresh_sqlite_gps_and_workout_structure(fit_path: Path, db_path: Path, meta
             SET fit_sha256 = ?,
                 garmin_activity_id = COALESCE(garmin_activity_id, ?),
                 source_file_name = ?,
+                activity_name = COALESCE(NULLIF(activity_name, ''), ?),
                 start_latitude = ?,
                 start_longitude = ?,
                 end_latitude = ?,
@@ -2448,6 +2463,7 @@ def refresh_sqlite_gps_and_workout_structure(fit_path: Path, db_path: Path, meta
                 activity_row.get("fit_sha256"),
                 activity_row.get("garmin_activity_id"),
                 fit_path.name,
+                activity_row.get("activity_name"),
                 activity_row.get("start_latitude"),
                 activity_row.get("start_longitude"),
                 activity_row.get("end_latitude"),
@@ -2475,7 +2491,16 @@ def create_workbook(fit_path: Path, output_path: Path, metadata=None, fetch_weat
     wb = Workbook()
     ws = wb.active
     ws.title = "每公里數據"
-    add_metadata_sheet(wb, metadata, fit_path, session, rows, messages.get("record_mesgs", []), dropdown_options)
+    add_metadata_sheet(
+        wb,
+        metadata,
+        fit_path,
+        session,
+        fit_workout_name(messages),
+        rows,
+        messages.get("record_mesgs", []),
+        dropdown_options,
+    )
     add_workout_structure_sheet(wb, messages)
     date_label = activity_date(session, fit_path)
     ws["A1"] = f"{WORKBOOK_VERSION_NAME} - {date_label} (資料來源: {fit_path.name})"

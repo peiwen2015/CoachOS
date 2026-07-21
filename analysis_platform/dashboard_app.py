@@ -7530,7 +7530,7 @@ def monthly_ai_handoff_text(monthly, intelligence, progress_row, distribution_ro
             f"- 已確認知識：{knowledge_summary['detail']}",
         ])
 
-    wsi_lines = wsi_period_prompt_lines(wsi_summary)
+    wsi_lines = wsi_period_prompt_lines(wsi_summary, verdict)
     if wsi_lines:
         prompt_lines.extend([
             "",
@@ -9191,6 +9191,7 @@ def wsi_period_summary(connection, start_date, end_date, period_label):
             r.activity_id,
             r.activity_date,
             r.distance_km,
+            r.training_load,
             COALESCE(r.workout_type_name_zh, r.activity_type, '活動') AS workout_label,
             w.mission_category,
             w.mission_status,
@@ -9212,6 +9213,15 @@ def wsi_period_summary(connection, start_date, end_date, period_label):
         for row in usable_rows
         if row["mission_category"]
     )
+    mission_metrics = {}
+    for row in usable_rows:
+        mission = row["mission_category"]
+        if not mission:
+            continue
+        metrics = mission_metrics.setdefault(mission, {"count": 0, "km": 0.0, "load": 0.0})
+        metrics["count"] += 1
+        metrics["km"] += float(row["distance_km"] or 0)
+        metrics["load"] += float(row["training_load"] or 0)
     status_counts = Counter(
         row["mission_status"]
         for row in usable_rows
@@ -9262,6 +9272,7 @@ def wsi_period_summary(connection, start_date, end_date, period_label):
         "endDate": end_date,
         "total": len(rows),
         "missionCounts": dict(mission_counts),
+        "missionMetrics": mission_metrics,
         "missionExamples": mission_examples,
         "statusCounts": dict(status_counts),
         "continuityCounts": dict(continuity_counts),
@@ -9280,7 +9291,7 @@ def wsi_period_interpretation(summary):
     if total == 0:
         return "這段期間還沒有活動可以形成序列理解。"
     if not summary["dominantMission"]:
-        return "這段期間已有活動，但還沒有足夠的序列理解結果。先重算 WSI 或補齊活動標註後，週/月判讀會更完整。"
+        return "這段期間已有活動，但還沒有足夠的序列理解結果。先重新整理訓練序列理解或補齊活動標註後，週／月判讀會更完整。"
 
     mission_label, _mission_description = wsi_label(
         WSI_MISSION_LABELS,
@@ -9318,7 +9329,7 @@ def wsi_period_interpretation(summary):
     return base
 
 
-def monthly_wsi_learning(summary):
+def monthly_wsi_learning(summary, monthly_verdict=None):
     if not summary or summary.get("periodLabel") != "本月" or not summary.get("dominantMission"):
         return None
     total = max(1, int(summary.get("total") or 0))
@@ -9330,30 +9341,37 @@ def monthly_wsi_learning(summary):
     ready_count = int(summary.get("continuityCounts", {}).get("Ready", 0) or 0)
     partial_count = int(summary.get("statusCounts", {}).get("Partial", 0) or 0)
     dominant = summary["dominantMission"]
-    dominant_missions = set(summary.get("dominantMissions") or [dominant])
+    metrics = summary.get("missionMetrics", {})
+    build_load = float(metrics.get("Build", {}).get("load", 0) or 0)
+    recover_load = float(metrics.get("Recover", {}).get("load", 0) or 0)
+    total_load = sum(float(item.get("load", 0) or 0) for item in metrics.values())
+    load_rank = sorted(metrics.items(), key=lambda item: float(item[1].get("load", 0) or 0), reverse=True)
+    load_leader = load_rank[0][0] if load_rank else dominant
 
-    if {"Build", "Recover"}.issubset(dominant_missions):
-        title = "建構與吸收並重的訓練月"
-        body = "這個月不是單純往前推，也不是單純恢復；主刺激與恢復義務同時很明顯，代表訓練一邊建立能力，一邊整理累積的負荷。"
-    elif {"Build", "Prepare"}.issubset(dominant_missions):
-        title = "建構與銜接並重的訓練月"
-        body = "這個月既有明確主刺激，也有足夠銜接課把後面的訓練接起來。重點不是單次突破，而是讓刺激能持續成立。"
-    elif dominant == "Prepare" and prepare_count / total >= 0.38:
-        title = "以銜接為主的建構月"
-        body = "這個月不是一直堆主刺激，而是反覆把身體送進下一堂可用狀態，讓品質與耐力課能持續成立。"
-    elif dominant == "Build":
-        title = "主刺激明確的建構月"
-        body = "這個月的重點比較直接：用多堂主刺激把能力往前推。接下來真正要看的，是恢復與銜接有沒有跟上。"
-    elif dominant == "Recover":
-        title = "以吸收為主的調整月"
-        body = "這個月最常出現的是恢復義務，代表訓練不是只往前堆，而是在整理前面累積的負荷，讓身體重新變得可用。"
-    elif dominant == "Activate":
-        title = "以重新啟動為主的銜接月"
-        body = "這個月有較多課在把腿感、節奏或跑步狀態接回來，重點是恢復訓練節奏，而不是直接堆更大的刺激。"
+    if monthly_verdict == "吸收月":
+        title = "吸收調整中的訓練結構"
+        if recover_count:
+            body = "整體月負荷較近期基準下降，恢復角色也出現在序列結構裡；這些訓練序列證據支持把本月理解為吸收與整理。"
+        else:
+            body = "整體月負荷較近期基準下降，目前可用的訓練序列資料仍不足以完整解釋恢復來源；先以月度吸收判讀為主，不把局部建立能力結果當成整月建構。"
+    elif monthly_verdict == "負荷建構" and build_load and recover_load and build_load >= recover_load:
+        title = "建構與恢復並行的訓練結構"
+        body = "恢復課數量不少，但主要訓練負荷仍由建立能力課程推動；恢復角色更像是在承接刺激，而不是把整個月定義成調整月。"
+    elif monthly_verdict == "負荷建構" and load_leader == "Build":
+        title = "主刺激承擔主要負荷的訓練結構"
+        body = "這段期間的主要負荷由建立能力課程承擔，其他序列角色則負責讓刺激可以被吸收、銜接與延續。"
+    elif load_leader == "Recover":
+        title = "恢復角色承擔主要負荷的訓練結構"
+        body = "恢復課不只在堂數上偏多，承擔的訓練負荷也成為主要部分；這才支持把這段期間理解為以吸收為主的結構。"
+    elif load_leader == "Prepare":
+        title = "銜接角色承擔主要負荷的訓練結構"
+        body = "這段期間反覆把身體送進下一堂可用狀態，銜接課是主要結構，但不等於月度整體位置已經由訓練序列理解單獨決定。"
+    elif load_leader == "Activate":
+        title = "重新啟動為主的訓練結構"
+        body = "這段期間較多訓練在把腿感、節奏或跑步狀態接回來，重點是重新建立可持續的訓練入口。"
     else:
-        label, _description = wsi_label(WSI_MISSION_LABELS, dominant)
-        title = f"以{label}為主的訓練月"
-        body = "這個月的主要訓練角色已經開始浮現，但仍需要更多標註與前後脈絡來提高月層級判讀品質。"
+        title = "序列結構仍在形成"
+        body = "目前已有一些序列角色結果，但資料仍不足以把其中一種角色當成整段期間的主要結構。"
 
     supporting = []
     if build_count:
@@ -9362,13 +9380,16 @@ def monthly_wsi_learning(summary):
         supporting.append(f"{prepare_count} 堂銜接課負責讓下一堂接得起來")
     if recover_count:
         supporting.append(f"{recover_count} 堂恢復課負責整理負荷")
+    if total_load > 0 and load_rank:
+        load_percent = round(float(load_rank[0][1].get("load", 0) or 0) / total_load * 100)
+        load_label, _description = wsi_label(WSI_MISSION_LABELS, load_leader)
+        supporting.append(f"{load_label}承擔約 {load_percent}% 的可用序列負荷")
     if activate_count:
         supporting.append(f"{activate_count} 堂重新啟動負責接回節奏")
     if ready_count:
         supporting.append(f"{ready_count} 堂把序列推到可用狀態")
     if partial_count:
         supporting.append(f"{partial_count} 堂完成度需要保守看")
-
     return {
         "title": title,
         "body": body,
@@ -9376,7 +9397,7 @@ def monthly_wsi_learning(summary):
     }
 
 
-def wsi_period_prompt_lines(summary):
+def wsi_period_prompt_lines(summary, monthly_verdict=None):
     if not summary:
         return []
     dominant_label = "—"
@@ -9402,22 +9423,23 @@ def wsi_period_prompt_lines(summary):
         continuity_parts.append(f"{label} {count}")
     lines = [
         f"- 期間：{summary['startDate']} – {summary['endDate']}",
-        f"- 主要序列角色：{dominant_label}",
+        f"- 堂數最多的序列角色：{dominant_label}",
         f"- 任務分布：{', '.join(mission_parts) if mission_parts else '尚未形成'}",
         f"- 序列狀態：{', '.join(continuity_parts) if continuity_parts else '尚未形成'}",
         f"- 資料信心：{summary['usableCount']}/{summary['total']} 可用；需要補標註 {summary['needsAnnotationCount']} 堂",
         f"- 序列讀法：{wsi_period_interpretation(summary)}",
     ]
-    learning = monthly_wsi_learning(summary)
+    learning = monthly_wsi_learning(summary, monthly_verdict)
     if learning:
         lines.extend([
-            f"- 本月位置：{learning['title']}",
-            f"- 月層級教練判讀：{learning['body']}",
+            f"- 月度整體判讀：{monthly_verdict}" if monthly_verdict else "- 月度整體判讀：由月回顧主流程提供",
+            f"- 本月訓練結構：{learning['title']}",
+            f"- 序列結構解讀：{learning['body']}",
         ])
     return lines
 
 
-def wsi_period_panel(summary):
+def wsi_period_panel(summary, monthly_verdict=None):
     if not summary:
         return ""
 
@@ -9467,7 +9489,7 @@ def wsi_period_panel(summary):
             <div class="review-card">
               <span>尚未形成分布</span>
               <strong>—</strong>
-              <p>這段期間還沒有可用的 WSI 結果。</p>
+              <p>這段期間還沒有可用的訓練序列理解結果。</p>
             </div>
             """
         )
@@ -9482,7 +9504,7 @@ def wsi_period_panel(summary):
 
     period_label = summary["periodLabel"]
     interpretation = wsi_period_interpretation(summary)
-    monthly_learning = monthly_wsi_learning(summary)
+    monthly_learning = monthly_wsi_learning(summary, monthly_verdict)
     monthly_learning_html = ""
     if monthly_learning:
         supporting_html = ""
@@ -9494,7 +9516,7 @@ def wsi_period_panel(summary):
             """
         monthly_learning_html = f"""
           <div class="wsi-month-hero">
-            <span>這個月的位置</span>
+            <span>本月訓練結構</span>
             <strong>{html.escape(monthly_learning["title"])}</strong>
             <p>{html.escape(monthly_learning["body"])}</p>
             {supporting_html}
@@ -9504,16 +9526,16 @@ def wsi_period_panel(summary):
     if summary["needsAnnotationCount"]:
         low_confidence_count = int(summary["needsAnnotationCount"])
         annotation_hint = f"""
-          <p class="note">有 {low_confidence_count} 堂資料信心較低。這通常不是 WSI 壞掉，而是活動標註或前後脈絡還不夠清楚。</p>
+          <p class="note">有 {low_confidence_count} 堂資料信心較低。這通常不是訓練序列理解失效，而是活動標註或前後脈絡還不夠清楚。</p>
         """
 
     return f"""
       <section class="panel-section" id="{html.escape(period_label)}-sequence-intelligence">
-        <h2>{html.escape(period_label)}訓練重點</h2>
-        <p class="note">這裡不是重算單堂課，而是把這段期間的活動放回前後脈絡裡，看主要在建立能力、準備下一堂、吸收恢復，還是重新啟動節奏。</p>
+        <h2>{html.escape('本月訓練結構' if period_label == '本月' else period_label + '訓練重點')}</h2>
+        <p class="note">這裡不是重算單堂課，也不是重新定義月份狀態；而是把這段期間的活動放回前後脈絡裡，看各種序列角色如何共同形成訓練結構。</p>
         {monthly_learning_html}
         <div class="metric-grid training-kpi-grid briefing-evidence-grid">
-          {activity_driver_card('主要序列角色', dominant_label, f'{period_label}出現最多的訓練序列角色。')}
+          {activity_driver_card('堂數最多的序列角色', dominant_label, f'{period_label}出現最多的訓練序列角色；這不單獨代表月度整體位置。')}
           {activity_driver_card('資料信心', f"{summary['usableCount']}/{summary['total']} 可用", '可用代表目前標註與前後活動足以支撐序列判讀。')}
           {activity_driver_card('需要補標註', f"{summary['needsAnnotationCount']} 堂", '這些活動會先保守判讀，補標註後週/月理解會更穩。')}
         </div>
@@ -9561,7 +9583,7 @@ def activity_wsi_panel(wsi, activity_id=None):
         evidence_warning = f"""
           <div class="coach-summary review-summary">
             <span>判讀信心較低</span>
-            <p>{html.escape(wsi.get('evidenceNote') or '這筆活動需要先補標註，WSI 才會更穩。')}</p>
+            <p>{html.escape(wsi.get('evidenceNote') or '這筆活動需要先補標註，訓練序列理解才會更穩。')}</p>
             {annotation_link}
           </div>
         """
@@ -10188,7 +10210,7 @@ def monthly_review_panel(monthly, intelligence, progress_row, assignment_quality
         <h2>教練看了哪些關鍵課</h2>
         {monthly_key_sessions_table(key_session_rows)}
       </section>
-      {wsi_period_panel(wsi_summary)}
+      {wsi_period_panel(wsi_summary, verdict)}
       {monthly_ai_handoff_panel(monthly, intelligence, progress_row, distribution_rows, key_session_rows, workout_structure_summary_rows, related_week_rows, coach_memory, knowledge_summary, wsi_summary, saved_reply)}
     """
 

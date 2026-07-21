@@ -76,6 +76,8 @@ It should draw primarily from:
 - selected `Evidence`
 - selected `Confidence`
 
+When Monthly uses Workout Sequence Intelligence as evidence, it should distinguish between the month’s overall adaptation position and the roles played by individual workouts. A high count of `Recover` or easy workouts is not sufficient to call the month an absorption month; the page should also consider total training load, load trend, continuity, and which roles carried that load.
+
 Why is not the full evidence dump.
 
 It is the explanation layer that makes the opening believable.
@@ -110,6 +112,9 @@ This is where supporting detail belongs:
 - trends
 - key sessions
 - training distribution
+- sequence-role distribution and load contribution, when available
+
+Sequence-role distribution should be presented as supporting structure. It should not override the monthly verdict merely because one Mission has the highest workout count.
 
 Evidence exists to support the letter, not to replace it.
 

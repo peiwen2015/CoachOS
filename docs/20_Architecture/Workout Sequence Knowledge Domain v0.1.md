@@ -82,6 +82,27 @@ Those belong to other layers.
 
 Workout Sequence knowledge begins after Activity Intelligence has already created execution knowledge.
 
+## Aggregation Boundary
+
+Workout Sequence Intelligence may be rolled up into Weekly or Monthly as supporting context, but a rollup must preserve the domain boundary.
+
+The most frequent Mission by workout count is not, by itself, the training position of the week or month. Recovery and easy workouts naturally occur often in many training structures, while a smaller number of Build workouts may carry most of the training load.
+
+Therefore:
+
+- `Mission` describes the role of an individual workout inside its surrounding sequence.
+- Monthly adaptation owns the month-level verdict, such as building, absorbing, consolidating, or stagnating.
+- Monthly may use Mission distribution to explain training structure and continuity, but must not equate `Recover`-dominant workout count with an absorption month.
+- When a period rollup is needed, workout count, distance, training load, continuity state, and evidence completeness should remain distinguishable rather than being collapsed into one `dominantMission` label.
+
+The product should describe these as separate questions:
+
+- `Monthly position`: What is the month becoming overall?
+- `Training structure`: What roles did the workouts play across the month?
+- `Load source`: Which roles carried the month’s training load?
+
+This keeps a normal build month with many recovery runs from being mislabeled as a recovery or adjustment month.
+
 ## Domain Entities
 
 The core entities in this domain are:

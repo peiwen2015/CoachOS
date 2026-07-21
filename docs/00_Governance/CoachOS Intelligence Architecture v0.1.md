@@ -221,6 +221,14 @@ Monthly should primarily read progression knowledge, continuity patterns, and co
 
 It should not need raw daily evidence unless it is explaining an exception.
 
+Continuity patterns are supporting context, not a replacement for monthly adaptation judgment. In particular, Monthly must not derive its primary verdict from the most frequent Workout Sequence Mission. Recovery and easy workouts may be the most common sessions by count in a healthy build structure, while Build sessions carry a larger share of training load. Monthly should therefore keep these questions separate:
+
+- monthly position: the overall adaptation direction of the month
+- training structure: the distribution of sequence roles across workouts
+- load source: which sequence roles contributed most of the month’s training load
+
+WSI can explain how recovery, preparation, activation, and build sessions fit together, but `Recover`-dominant count alone does not mean the month is an absorption or adjustment month.
+
 ### Layer 5 — Readiness Intelligence
 
 Question:

@@ -76,6 +76,8 @@ It should not lead with heavy metrics.
 - partial/full month state
 - confidence and short cause
 
+The verdict belongs to Monthly adaptation. Workout Sequence Mission distribution may support the explanation, but it must not independently redefine the verdict. In particular, a month with many Recovery or Easy sessions can still be a controlled build if a smaller number of Build sessions carry the main increase in training load.
+
 ### Reduce
 
 - decorative rating treatment
@@ -184,6 +186,16 @@ This evidence view should answer:
 Example:
 
 `本月仍以輕鬆跑為主體，品質刺激已回來，但尚未壓過整體節奏。`
+
+This section describes training structure, not monthly position. It should be possible for the page to say both:
+
+`本月整體負荷正在建構。`
+
+and:
+
+`恢復課數量較多，主要用來承接 Build 課程帶來的刺激。`
+
+These statements are complementary when the overall load is rising and Recovery sessions are part of the normal support structure.
 
 ### Optional Supporting Evidence
 

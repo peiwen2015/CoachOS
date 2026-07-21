@@ -6,7 +6,7 @@
 
 ## Release Status
 
-- `v1.4.1` 已正式發布，下一版修正將進入 `v1.4.2`
+- `v1.4.2` 已正式發布
 - 產品對外主名稱維持 `CoachOS`
 - 核心資料鏈路已固定為 `FIT -> Excel -> SQLite -> Semantic Layer -> Dashboard`
 - `Workout Sequence Intelligence` 已接進 `Activity -> Weekly -> Monthly -> AI 交棒`
@@ -189,21 +189,22 @@ docs/      架構與產品文件
 
 ## 對外發布方向
 
-這個 repo 現在已完成 `v1.4.1`，下一步會進入 `v1.4.2` 的修正與打磨；目前主題仍是 `Workout Sequence Intelligence Product Layer`：
+這個 repo 現在已完成 `v1.4.2`；目前主題仍是 `Workout Sequence Intelligence Product Layer`：
 
 - 統一名稱：`CoachOS`
 - 把資料匯入工具作為產品裡的資料入口，而不是獨立散落的小工具
 - 以 deterministic、本機可用、knowledge-first 的方式建立跑步教練產品
 - 讓 `Activity` 裡確認的知識與序列理解，實際回流到 `Weekly / Monthly / AI 交棒`
 - 讓 `課表結構`、`GPS`、`活動最高心率修補`、`每日 / 每週 / 每月圖卡 prompt` 成為日常使用的一部分
-- 把 Activity / Weekly / Monthly 的 WSI 翻譯成一致的教練語言
+- 把 Activity / Weekly / Monthly 的訓練序列理解翻譯成一致的教練語言
 - 保持 Excel 單純，讓 WSI 留在 SQLite 與 CoachOS 產品層
 
-`v1.4.2` 的下一步，不再只是把 WSI 放進頁面，而是繼續收斂：
+`v1.4.2` 的重點，是把訓練序列理解與月回顧的語意邊界收斂清楚：
 
-- Overview 接上同一套跨時間尺度的教練語言
-- WSI rule review 與 validation evidence 持續回饋產品
-- 為後續 `Memory / Belief` 階段保留乾淨的產品基礎
+- 月回顧主判讀與訓練結構分開
+- 不再用恢復課堂數直接判定吸收月
+- 以可用序列負荷補充訓練角色分布
+- 統一月回顧與訓練序列理解的中文產品語言
 
 正式發布說明與版本備註可參考：
 
@@ -218,6 +219,10 @@ docs/      架構與產品文件
 [`RELEASE_NOTES_v1.3.6.md`](/Users/perryliu/Documents/Running%20Analytics/RELEASE_NOTES_v1.3.6.md)
 
 [`RELEASE_ANNOUNCEMENT_v1.3.6.md`](/Users/perryliu/Documents/Running%20Analytics/RELEASE_ANNOUNCEMENT_v1.3.6.md)
+
+[`RELEASE_NOTES_v1.4.2.md`](/Users/perryliu/Documents/Running%20Analytics/RELEASE_NOTES_v1.4.2.md)
+
+[`RELEASE_ANNOUNCEMENT_v1.4.2.md`](/Users/perryliu/Documents/Running%20Analytics/RELEASE_ANNOUNCEMENT_v1.4.2.md)
 
 [`RELEASE_NOTES_v1.4.1.md`](/Users/perryliu/Documents/Running%20Analytics/RELEASE_NOTES_v1.4.1.md)
 

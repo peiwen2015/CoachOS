@@ -5,7 +5,9 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === '/' || url.pathname === '/index.html') {
-      const homepage = HOME_HTML.replace('href=\"/downloads/CoachOS%20mRelay.js\"', 'href=\"https://coachos-mrelay.peiwen5806-2015-working.chatgpt.site/downloads/CoachOS%20mRelay.js\"');
+      const homepage = HOME_HTML
+        .replace('href=\"/downloads/CoachOS%20mRelay.js\"', 'href=\"https://coachos-mrelay.peiwen5806-2015-working.chatgpt.site/downloads/CoachOS%20mRelay.js\"')
+        .replace('安裝 <b>Scriptable</b> App。', '安裝 <a href=\"https://apps.apple.com/tw/app/scriptable/id1405459188\" style=\"text-decoration:underline\"><b>Scriptable</b> App</a>。');
       return new Response(homepage, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
     }
     if (url.pathname === '/downloads/CoachOS%20mRelay.js' || url.pathname === '/downloads/CoachOS mRelay.js') {

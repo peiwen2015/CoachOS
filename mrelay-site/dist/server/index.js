@@ -1,10 +1,11 @@
 import { createServer } from "node:http";
 import { existsSync, createReadStream, statSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
-import { fileURLToPath } from "node:url";
 
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const root = normalize(join(__dirname, ".."));
+const cwd = process.cwd();
+const root = normalize(
+  existsSync(join(cwd, "index.html")) ? cwd : join(cwd, "..")
+);
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",

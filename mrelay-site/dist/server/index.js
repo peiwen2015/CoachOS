@@ -1,10 +1,9 @@
 import { createServer } from "node:http";
-import { readFileSync, statSync, existsSync, createReadStream } from "node:fs";
+import { existsSync, createReadStream, statSync } from "node:fs";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = new URL(".", import.meta.url).pathname;
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const root = normalize(join(__dirname, ".."));
 
 const mimeTypes = {

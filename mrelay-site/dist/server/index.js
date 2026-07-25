@@ -6,40 +6,135 @@ const inlineHtml = `<!doctype html>
   <meta name="theme-color" content="#102a43">
   <meta name="description" content="CoachOS mRelay：跑完步，在 iPhone 上用 Scriptable 把 Garmin Connect 活動資料直接交給 AI 教練。">
   <title>CoachOS mRelay | Garmin to AI</title>
-  <style>
-    body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f8f5ed;color:#102a43;line-height:1.6}
-    main{max-width:980px;margin:0 auto;padding:32px 20px 64px}
-    .card{background:#fffdf8;border:1px solid #dce5e6;border-radius:20px;padding:28px}
-    .eyebrow{letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:#ef8354;font-weight:700}
-    h1{font-size:clamp(40px,8vw,72px);line-height:1.03;margin:12px 0 18px}
-    p{font-size:16px;max-width:58rem}
-    a.button{display:inline-block;margin:12px 12px 0 0;padding:14px 18px;border-radius:10px;text-decoration:none;font-weight:700}
-    .primary{background:#ef8354;color:#fff}
-    .quiet{border:1px solid #b4c7ca;color:#102a43}
-    .grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-top:28px}
-    .tile{background:#fff;border:1px solid #dce5e6;border-radius:16px;padding:18px}
-    .muted{color:#688096}
-    code{background:#102a4320;padding:2px 5px;border-radius:6px}
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main>
-    <section class="card">
-      <div class="eyebrow">GARMIN CONNECT × AI</div>
-      <h1>把跑步資料，直接交給 AI 教練。</h1>
-      <p>CoachOS mRelay 是一個搭配 iPhone／iPad 上 Scriptable 的 JavaScript 工具。跑完步後，從 Garmin Connect 讀取活動原始內容，整理後直接交給 AI 分析。</p>
-      <p>
-        <a class="button primary" href="downloads/CoachOS%20mRelay.js" download>下載 Scriptable 腳本</a>
-        <a class="button quiet" href="#how">查看流程</a>
-      </p>
-      <p class="muted">如果你看到這個版本，代表首頁已正常載入；下面是簡化版內容，之後我可以再把完整圖文版同步回來。</p>
+    <section class="hero shell">
+      <nav class="nav" aria-label="主要導覽">
+        <a class="brand" href="#top" aria-label="CoachOS mRelay 首頁">
+          <span class="brand-mark">m</span>
+          <span>CoachOS <b>mRelay</b></span>
+        </a>
+        <a class="nav-link" href="#install">安裝方式</a>
+      </nav>
+
+      <div class="hero-grid" id="top">
+        <div class="hero-copy">
+          <p class="eyebrow">GARMIN CONNECT × AI</p>
+          <h1>把跑步資料，<em>直接交給 AI 教練。</em></h1>
+          <p class="lead">CoachOS mRelay 是一個 JavaScript 程式，搭配 iPhone／iPad 上的 Scriptable App 執行。跑完步，從 Garmin Connect 讀取活動原始內容，直接複製給 AI 教練分析。</p>
+          <div class="actions">
+            <a class="button button-primary" href="downloads/CoachOS%20mRelay.js" download>下載 Scriptable 腳本 <span>↓</span></a>
+            <a class="button button-quiet" href="#how-it-works">查看流程 <span>↘</span></a>
+          </div>
+          <p class="microcopy">目前支援 iPhone／iPad + Scriptable。Android 無法直接執行此腳本。</p>
+        </div>
+        <div class="hero-phone-wrap" aria-label="在 iPhone 上把 Garmin 活動交給 AI 教練">
+          <div class="hero-phone">
+            <div class="phone-speaker"></div>
+            <img src="assets/screens/S__32907269_0.jpg" alt="iPhone 上的 Garmin Connect 活動頁面" fetchpriority="high">
+            <div class="phone-home"></div>
+          </div>
+          <div class="relay-badge"><span class="status-dot"></span><b>GARMIN</b><i></i><b>AI 教練</b></div>
+          <p class="phone-caption">跑完一場，手機就是資料接力站。</p>
+        </div>
+      </div>
     </section>
-    <section id="how" class="grid">
-      <div class="tile"><strong>01 選活動</strong><p class="muted">在 Garmin Connect 內開啟要分析的跑步活動。</p></div>
-      <div class="tile"><strong>02 切換分頁</strong><p class="muted">先看數據，再切到計圈或間歇訓練分頁。</p></div>
-      <div class="tile"><strong>03 貼給 AI</strong><p class="muted">內容會複製到剪貼簿，直接貼到 ChatGPT 或其他 AI。</p></div>
+
+    <section class="signal-bar">
+      <div class="shell signal-inner">
+        <span>01</span><strong>開啟活動</strong><i></i>
+        <span>02</span><strong>切換分頁</strong><i></i>
+        <span>03</span><strong>貼給 AI</strong>
+      </div>
+    </section>
+
+    <section class="section shell" id="how-it-works">
+      <div class="section-heading">
+        <p class="eyebrow">HOW IT WORKS</p>
+        <h2>三步，完成一次資料接力。</h2>
+        <p>你只需要在 Garmin Connect 裡做一次選擇，其餘由 mRelay 整理成 AI 看得懂的原始內容。</p>
+      </div>
+      <div class="steps">
+        <article class="step-card"><span class="step-number">01</span><h3>選活動</h3><p>執行腳本後，程式會開啟 Garmin Connect 活動列表。登入並點進要分析的活動。</p></article>
+        <article class="step-card"><span class="step-number">02</span><h3>選第二分頁</h3><p>先保留「數據」分頁，再切換到「計圈」或「間歇訓練」分頁，等表格載入後關閉。</p></article>
+        <article class="step-card"><span class="step-number">03</span><h3>貼給 AI</h3><p>完整原始內容會自動複製到剪貼簿。開啟 ChatGPT、Claude 或 Gemini，貼上即可。</p></article>
+      </div>
+    </section>
+
+    <section class="section screenshot-section shell" id="screenshots">
+      <div class="section-heading">
+        <p class="eyebrow">ON YOUR IPHONE</p>
+        <h2>照著畫面走，就不會迷路。</h2>
+        <p>以下截圖是實際操作順序。每次關閉 Garmin WebView 前，先確認目前停在正確的分頁。</p>
+      </div>
+      <div class="screenshots">
+        <figure class="screen-card">
+          <img src="assets/screens/S__32907267_0.jpg" alt="Scriptable 中的 CoachOS mRelay 啟動提示" loading="lazy">
+          <figcaption><span>01</span><div><b>啟動 mRelay</b><small>在 Scriptable 點擊 CoachOS mRelay，按「開啟 Garmin」。</small></div></figcaption>
+        </figure>
+        <figure class="screen-card">
+          <img src="assets/screens/S__32907268_0.jpg" alt="Garmin Connect 活動列表" loading="lazy">
+          <figcaption><span>02</span><div><b>選擇活動</b><small>在活動列表點進要分析的跑步活動。</small></div></figcaption>
+        </figure>
+        <figure class="screen-card">
+          <img src="assets/screens/S__32907269_0.jpg" alt="Garmin Connect 活動數據頁" loading="lazy">
+          <figcaption><span>03</span><div><b>保留數據分頁</b><small>等摘要內容載入完成，再關閉 Garmin WebView。</small></div></figcaption>
+        </figure>
+        <figure class="screen-card">
+          <img src="assets/screens/S__32907270_0.jpg" alt="Scriptable 提示切換到計圈或間歇訓練分頁" loading="lazy">
+          <figcaption><span>04</span><div><b>準備第二次讀取</b><small>按下「開啟計圈／間歇訓練」，回到同一個活動頁。</small></div></figcaption>
+        </figure>
+        <figure class="screen-card">
+          <img src="assets/screens/S__32907271_0.jpg" alt="Garmin Connect 間歇訓練分頁表格" loading="lazy">
+          <figcaption><span>05</span><div><b>切換資料分頁</b><small>選擇「計圈」或「間歇訓練」，不要選第三個「區段」。</small></div></figcaption>
+        </figure>
+        <figure class="screen-card">
+          <img src="assets/screens/S__32907272_0.jpg" alt="CoachOS mRelay 完成並複製到剪貼簿" loading="lazy">
+          <figcaption><span>06</span><div><b>貼給 AI</b><small>看到完成提示後，開啟常用 AI，進入 Project／對話並貼上。</small></div></figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="split-section shell">
+      <div class="info-panel dark-panel">
+        <p class="eyebrow">WHY RAW DOM</p>
+        <h2>不猜欄位，保留現場。</h2>
+        <p>Garmin Connect 是動態渲染的 SPA。mRelay 在你關閉 WebView 後讀取畫面內容，不依賴 Garmin API，也不把欄位位置寫死。</p>
+        <div class="quote">「讓 AI 讀完整上下文，而不是只讀幾個數字。」</div>
+      </div>
+      <div class="info-panel paper-panel">
+        <p class="eyebrow">WHAT AI GETS</p>
+        <ul class="feature-list">
+          <li><span>↗</span><div><b>數據分頁</b><small>活動摘要、心率、功率、訓練效果、主觀感受</small></div></li>
+          <li><span>↗</span><div><b>計圈／間歇訓練分頁</b><small>各段時間、距離、配速、心率與跑步動態</small></div></li>
+          <li><span>↗</span><div><b>日期上下文</b><small>保留 Garmin 顯示的今天、昨天、星期幾或完整日期</small></div></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="section shell" id="install">
+      <div class="install-box">
+        <div>
+          <p class="eyebrow">INSTALL ON IOS</p>
+          <h2>從網站下載，放進 Scriptable。</h2>
+        </div>
+        <ol class="install-list">
+          <li>安裝 <b>Scriptable</b> App。</li>
+          <li>點擊網站上的「下載 Scriptable 腳本」。</li>
+          <li>在「檔案」App 將 <code>CoachOS mRelay.js</code> 儲存到 <code>iCloud Drive／Scriptable</code>。</li>
+          <li>回到 Scriptable，在 Scripts 清單執行腳本。</li>
+        </ol>
+        <p class="fine-print">第一次使用時，請在 WebView 中登入 Garmin Connect。腳本不會把帳號密碼、Cookie 或 Token 寫入程式。</p>
+      </div>
     </section>
   </main>
+
+  <footer class="footer shell">
+    <span>CoachOS mRelay</span>
+    <span>JavaScript · Scriptable · Garmin Connect</span>
+  </footer>
 </body>
 </html>`;
 
@@ -56,12 +151,6 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/" || url.pathname === "/index.html") {
-      try {
-        const response = await env.ASSETS.fetch(new Request(new URL("/index.html", request.url), request));
-        if (response.status !== 404) return response;
-      } catch {
-        // Fall back to inline HTML when the asset binding is unavailable.
-      }
       return serveInlineHtml();
     }
 

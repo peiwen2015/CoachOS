@@ -22,6 +22,7 @@ h1 em { color:var(--orange); font-style:normal; }
 .button { align-items:center; border-radius:4px; display:inline-flex; font-size:13px; font-weight:800; gap:18px; justify-content:space-between; padding:15px 18px; transition:transform .2s, box-shadow .2s; }
 .button:hover { box-shadow:0 8px 20px #102a4320; transform:translateY(-2px); }
 .button-primary { background:var(--orange); color:#fff; min-width:210px; }
+.button-apk { background:var(--navy); }
 .button-quiet { border:1px solid #b4c7ca; min-width:138px; }
 .microcopy { color:var(--muted); font-size:11px; margin:20px 0 0; }
 .hero-phone-wrap { align-items:center; display:flex; flex-direction:column; position:relative; }
@@ -83,6 +84,9 @@ h2 { font-size:clamp(32px, 5vw, 52px); letter-spacing:-.06em; line-height:1.05; 
 .feature-list small { color:var(--muted); font-size:12px; margin-top:3px; }
 .install-box { background:var(--orange); color:#fff; display:grid; gap:30px; grid-template-columns:.9fr 1.1fr; padding:50px; }
 .install-box .eyebrow { color:var(--navy); }
+.android-install { background:var(--navy); margin-top:18px; }
+.android-install .eyebrow { color:var(--mint); }
+.button-light { background:var(--mint); color:var(--navy); margin-top:20px; }
 .install-list { margin:0; padding-left:20px; }
 .install-list li { margin-bottom:8px; }
 code { background:#102a4320; font-family:'DM Mono', monospace; font-size:.88em; padding:2px 5px; }

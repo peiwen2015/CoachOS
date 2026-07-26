@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#102a43">
-  <meta name="description" content="CoachOS mRelay：跑完步，在 iPhone 上用 Scriptable 把 Garmin Connect 活動資料直接交給 AI 教練。">
+  <meta name="description" content="CoachOS mRelay：跑完步，在 iPhone 或 Android 上把 Garmin Connect 活動資料直接交給 AI 教練。">
   <title>CoachOS mRelay | Garmin to AI</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -23,12 +23,13 @@
         <div class="hero-copy">
           <p class="eyebrow">GARMIN CONNECT × AI</p>
           <h1>把跑步資料，<em>直接交給 AI 教練。</em></h1>
-          <p class="lead">CoachOS mRelay 是一個 JavaScript 程式，搭配 iPhone／iPad 上的 Scriptable App 執行。跑完步，從 Garmin Connect 讀取活動原始內容，直接複製給 AI 教練分析。</p>
+          <p class="lead">CoachOS mRelay 讓手機成為 Garmin Connect 與 AI 教練之間的資料接力站。iPhone／iPad 可用 Scriptable 腳本，Android 可安裝 mRelay App。</p>
           <div class="actions">
             <a class="button button-primary" href="https://coachos-mrelay.peiwen5806-2015-working.chatgpt.site/downloads/CoachOS%20mRelay.js" download>下載 Scriptable 腳本 <span>↓</span></a>
+            <a class="button button-primary button-apk" href="https://coachos-mrelay.peiwen5806-2015-working.chatgpt.site/downloads/CoachOS-mRelay-Android-v0.2.0-release.apk" download>下載 Android APK <span>↓</span></a>
             <a class="button button-quiet" href="#how-it-works">查看流程 <span>↘</span></a>
           </div>
-          <p class="microcopy">目前支援 iPhone／iPad + Scriptable。Android 無法直接執行此腳本。</p>
+          <p class="microcopy">Android APK 是自行安裝版。Google Play 上架前，可先從網站下載安裝。</p>
         </div>
         <div class="hero-phone-wrap" aria-label="在 iPhone 上把 Garmin 活動交給 AI 教練">
           <div class="hero-phone">
@@ -127,6 +128,20 @@
           <li>回到 Scriptable，在 Scripts 清單執行腳本。</li>
         </ol>
         <p class="fine-print">第一次使用時，請在 WebView 中登入 Garmin Connect。腳本不會把帳號密碼、Cookie 或 Token 寫入程式。</p>
+      </div>
+      <div class="install-box android-install">
+        <div>
+          <p class="eyebrow">INSTALL ON ANDROID</p>
+          <h2>下載 APK，直接安裝 mRelay App。</h2>
+          <a class="button button-primary button-light" href="https://coachos-mrelay.peiwen5806-2015-working.chatgpt.site/downloads/CoachOS-mRelay-Android-v0.2.0-release.apk" download>下載 Android APK <span>↓</span></a>
+        </div>
+        <ol class="install-list">
+          <li>在 Android 手機開啟本頁，點擊「下載 Android APK」。</li>
+          <li>下載後點選 APK 檔案並允許安裝未知來源 App。</li>
+          <li>開啟 <code>CoachOS mRelay</code>，登入 Garmin Connect。</li>
+          <li>先按「存數據分頁」，切到「間歇訓練／計圈」後按「存第二頁並複製」。</li>
+        </ol>
+        <p class="fine-print">這是自行安裝的 signed release APK，不是 Google Play 版本。安裝時 Android 可能顯示安全提示，這是側載 App 的正常流程。</p>
       </div>
     </section>
   </main>

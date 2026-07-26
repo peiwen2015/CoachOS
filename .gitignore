@@ -25,3 +25,7 @@ official_sdk_summary.json
 stamina_candidates.csv
 ~$*
 *.bak
+
+# Android local signing secrets
+mrelay-android/signing.properties
+mrelay-android/keystore/*.jks

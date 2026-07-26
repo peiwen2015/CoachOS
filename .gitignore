@@ -29,3 +29,6 @@ stamina_candidates.csv
 # Android local signing secrets
 mrelay-android/signing.properties
 mrelay-android/keystore/*.jks
+mrelay-android/.gradle/
+mrelay-android/build/
+mrelay-android/app/build/

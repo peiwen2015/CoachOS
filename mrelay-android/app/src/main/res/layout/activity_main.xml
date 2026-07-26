@@ -48,6 +48,19 @@
             android:textSize="14sp" />
     </LinearLayout>
 
+    <Button
+        android:id="@+id/autoCaptureButton"
+        android:layout_width="match_parent"
+        android:layout_height="46dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginLeft="12dp"
+        android:layout_marginRight="12dp"
+        android:background="@drawable/button_primary"
+        android:text="一鍵擷取並複製"
+        android:textAllCaps="false"
+        android:textColor="#FFFFFF"
+        android:textSize="15sp" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -121,7 +134,7 @@
         android:paddingBottom="8dp"
         android:paddingLeft="14dp"
         android:paddingRight="14dp"
-        android:text="開啟 Garmin Connect，登入後點進活動。先存數據分頁，再切到間歇訓練或計圈。"
+        android:text="開啟 Garmin Connect，登入後點進活動。按「一鍵擷取並複製」自動取得數據分頁與間歇訓練。"
         android:textColor="#425047"
         android:textSize="13sp" />
 

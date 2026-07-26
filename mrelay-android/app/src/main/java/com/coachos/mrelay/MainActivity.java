@@ -8,6 +8,8 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.WebChromeClient;
@@ -21,9 +23,12 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
     private static final String GARMIN_ACTIVITIES_URL = "https://connect.garmin.com/modern/activities";
+    private static final int AUTO_CAPTURE_MAX_ATTEMPTS = 12;
+    private static final long AUTO_CAPTURE_RETRY_MS = 900L;
 
     private WebView webView;
     private TextView statusText;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private String summaryPageText = "";
     private String summaryPageUrl = "";
     private String lastPayload = "";
@@ -37,6 +42,7 @@ public class MainActivity extends Activity {
         statusText = findViewById(R.id.statusText);
         Button openGarminButton = findViewById(R.id.openGarminButton);
         Button clearButton = findViewById(R.id.clearButton);
+        Button autoCaptureButton = findViewById(R.id.autoCaptureButton);
         Button captureSummaryButton = findViewById(R.id.captureSummaryButton);
         Button captureDetailButton = findViewById(R.id.captureDetailButton);
         Button previewButton = findViewById(R.id.previewButton);
@@ -52,6 +58,7 @@ public class MainActivity extends Activity {
 
         openGarminButton.setOnClickListener(v -> webView.loadUrl(GARMIN_ACTIVITIES_URL));
         clearButton.setOnClickListener(v -> clearCaptureState());
+        autoCaptureButton.setOnClickListener(v -> captureBothPagesAndCopy());
         captureSummaryButton.setOnClickListener(v -> captureSummaryPage());
         captureDetailButton.setOnClickListener(v -> captureDetailPageAndCopy());
         previewButton.setOnClickListener(v -> showPreview());
@@ -103,6 +110,34 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void captureBothPagesAndCopy() {
+        statusText.setText("正在一鍵擷取數據分頁...");
+        capturePageText(pageText -> {
+            if (!looksLikeActivitySummary(pageText)) {
+                statusText.setText("這不像 Garmin 活動頁。請先點進活動並等待資料載入。");
+                Toast.makeText(this, "請先開啟活動頁", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            summaryPageText = cleanGarminSummaryText(pageText);
+            summaryPageUrl = safe(webView.getUrl());
+            lastPayload = buildCoachOsPayload(summaryPageUrl, "", summaryPageText, "");
+
+            if (looksLikeSplitTable(pageText)) {
+                finishAutoCaptureWithDetail(pageText);
+                return;
+            }
+
+            statusText.setText("已存數據分頁，正在自動切到間歇訓練...");
+            clickDetailTab(clicked -> {
+                if (!clicked) {
+                    statusText.setText("找不到間歇訓練分頁，仍會嘗試等待表格；若失敗請手動切分頁。");
+                }
+                waitForDetailPageAndCopy(1);
+            });
+        });
+    }
+
     private void captureDetailPageAndCopy() {
         if (summaryPageText.trim().isEmpty()) {
             statusText.setText("請先在數據分頁按「存數據分頁」。");
@@ -130,17 +165,84 @@ public class MainActivity extends Activity {
         });
     }
 
+    private void clickDetailTab(BooleanCallback callback) {
+        webView.evaluateJavascript(
+            "(function(){"
+                + "var labels=['間歇訓練','計圈'];"
+                + "function visible(el){"
+                + "  var r=el.getBoundingClientRect();"
+                + "  var s=getComputedStyle(el);"
+                + "  return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none';"
+                + "}"
+                + "function textOf(el){return (el.innerText||el.textContent||'').trim().replace(/\\s+/g,' ');}"
+                + "var nodes=Array.from(document.querySelectorAll('button,a,[role=\"tab\"],[role=\"button\"],li,div,span'));"
+                + "for(var i=0;i<labels.length;i++){"
+                + "  var label=labels[i];"
+                + "  for(var j=0;j<nodes.length;j++){"
+                + "    var el=nodes[j];"
+                + "    if(!visible(el)){continue;}"
+                + "    var text=textOf(el);"
+                + "    if(text===label||text.indexOf(label+' ')===0){"
+                + "      var target=el.closest('button,a,[role=\"tab\"],[role=\"button\"],li')||el;"
+                + "      target.scrollIntoView({block:'center',inline:'center'});"
+                + "      target.click();"
+                + "      return true;"
+                + "    }"
+                + "  }"
+                + "}"
+                + "return false;"
+                + "})()",
+            rawResult -> callback.onResult("true".equals(rawResult))
+        );
+    }
+
+    private void waitForDetailPageAndCopy(int attempt) {
+        statusText.setText("正在等待第二頁表格載入... " + attempt + "/" + AUTO_CAPTURE_MAX_ATTEMPTS);
+        mainHandler.postDelayed(() -> readPageText(pageText -> {
+            if (looksLikeSplitTable(pageText)) {
+                finishAutoCaptureWithDetail(pageText);
+                return;
+            }
+
+            if (attempt >= AUTO_CAPTURE_MAX_ATTEMPTS) {
+                statusText.setText("還沒讀到間歇/計圈表格。請手動切到該分頁，再按「存第二頁並複製」。");
+                Toast.makeText(this, "自動擷取第二頁逾時", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            waitForDetailPageAndCopy(attempt + 1);
+        }), AUTO_CAPTURE_RETRY_MS);
+    }
+
+    private void finishAutoCaptureWithDetail(String detailPageText) {
+        lastPayload = buildCoachOsPayload(
+            summaryPageUrl,
+            webView.getUrl(),
+            summaryPageText,
+            cleanGarminDetailText(detailPageText)
+        );
+        copyPayload(lastPayload);
+        statusText.setText("已一鍵複製數據分頁 + 第二頁內容，可貼到 ChatGPT / Claude / Gemini。");
+        Toast.makeText(this, "已一鍵複製 CoachOS mRelay 內容", Toast.LENGTH_SHORT).show();
+    }
+
     private void capturePageText(PageTextCallback callback) {
+        readPageText(pageText -> {
+            if (pageText.trim().isEmpty()) {
+                statusText.setText("沒有讀到內容，請等 Garmin 頁面載入完成後再試。");
+                Toast.makeText(this, "沒有讀到內容", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            callback.onPageText(pageText);
+        });
+    }
+
+    private void readPageText(PageTextCallback callback) {
         webView.evaluateJavascript(
             "(function(){return document.body ? document.body.innerText : '';})()",
             rawJsonText -> {
                 String pageText = decodeJavascriptString(rawJsonText);
-                if (pageText.trim().isEmpty()) {
-                    statusText.setText("沒有讀到內容，請等 Garmin 頁面載入完成後再試。");
-                    Toast.makeText(this, "沒有讀到內容", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
                 callback.onPageText(pageText);
             }
         );
@@ -379,5 +481,9 @@ public class MainActivity extends Activity {
 
     private interface PageTextCallback {
         void onPageText(String pageText);
+    }
+
+    private interface BooleanCallback {
+        void onResult(boolean value);
     }
 }

@@ -26,11 +26,12 @@ h1 em { color:var(--orange); font-style:normal; }
 .button-quiet { border:1px solid #b4c7ca; min-width:138px; }
 .microcopy { color:var(--muted); font-size:11px; margin:20px 0 0; }
 .hero-phone-wrap { align-items:center; display:flex; flex-direction:column; position:relative; }
-.hero-phone { background:#0c1824; border:9px solid #0a1722; border-radius:42px; box-shadow:18px 20px 0 var(--mint), 0 24px 50px #102a4330; max-width:286px; overflow:hidden; padding:0; position:relative; transform:rotate(3deg); width:100%; }
-.hero-phone::before { background:#152b3b; content:""; height:100%; left:0; opacity:.28; pointer-events:none; position:absolute; top:0; width:100%; z-index:2; }
-.hero-phone img { display:block; height:auto; width:100%; }
-.phone-speaker { background:#0a1722; border-radius:0 0 14px 14px; height:24px; left:50%; position:absolute; top:0; transform:translateX(-50%); width:112px; z-index:3; }
-.phone-home { background:#d8e5e4; border-radius:5px; bottom:7px; height:4px; left:50%; opacity:.8; position:absolute; transform:translateX(-50%); width:72px; z-index:3; }
+.hero-phone { background:linear-gradient(145deg,#2f6dff 0%,#111d33 14%,#05070c 56%,#244fde 100%); border:1px solid #6b96ff; border-radius:50px; box-shadow:18px 20px 0 var(--mint), 0 30px 60px #102a4335; max-width:304px; overflow:visible; padding:11px; position:relative; transform:rotate(3deg); width:100%; }
+.hero-phone::before { border:1px solid #ffffff24; border-radius:43px; box-shadow:inset 0 0 0 5px #070b12, inset 16px 0 18px #ffffff10, inset -12px 0 18px #0008; content:""; inset:5px; pointer-events:none; position:absolute; z-index:3; }
+.hero-phone::after { background:linear-gradient(180deg,#2f6dff,#0d1422); border-radius:0 8px 8px 0; content:""; height:108px; position:absolute; right:-5px; top:190px; width:5px; }
+.hero-phone img { background:#f8f5ed; border-radius:39px; display:block; height:auto; position:relative; width:100%; z-index:1; }
+.phone-speaker { background:radial-gradient(circle at 46% 44%,#34465f 0 18%,#0d1420 19% 56%,#000 57%); border:2px solid #05070c; border-radius:50%; box-shadow:0 0 0 3px #111827, inset 0 0 8px #5d9cff; height:34px; left:50%; position:absolute; top:22px; transform:translateX(-50%); width:34px; z-index:4; }
+.phone-home { background:#252525; border-radius:5px; bottom:18px; height:4px; left:50%; opacity:.65; position:absolute; transform:translateX(-50%); width:74px; z-index:4; }
 .relay-badge { align-items:center; background:var(--navy); border:1px solid #55788a; box-shadow:8px 8px 0 var(--orange); color:#fff; display:flex; font-family:'DM Mono', monospace; font-size:10px; gap:9px; margin:22px -70px 0 0; padding:12px 15px; transform:rotate(-3deg); }
 .relay-badge b { font-weight:500; letter-spacing:.05em; }
 .relay-badge i { background:var(--orange); height:1px; width:26px; }

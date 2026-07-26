@@ -25,6 +25,9 @@ public class MainActivity extends Activity {
     private static final String GARMIN_ACTIVITIES_URL = "https://connect.garmin.com/modern/activities";
     private static final int AUTO_CAPTURE_MAX_ATTEMPTS = 12;
     private static final long AUTO_CAPTURE_RETRY_MS = 900L;
+    private static final long BUTTON_FLASH_MS = 650L;
+    private static final int BUTTON_TEXT_DEFAULT = 0xFF13201A;
+    private static final int BUTTON_TEXT_ACTIVE = 0xFFFFFFFF;
 
     private WebView webView;
     private TextView statusText;
@@ -32,6 +35,8 @@ public class MainActivity extends Activity {
     private String summaryPageText = "";
     private String summaryPageUrl = "";
     private String lastPayload = "";
+    private Button activeButton;
+    private String activeButtonOriginalText = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -56,14 +61,36 @@ public class MainActivity extends Activity {
             return insets;
         });
 
-        openGarminButton.setOnClickListener(v -> webView.loadUrl(GARMIN_ACTIVITIES_URL));
-        clearButton.setOnClickListener(v -> clearCaptureState());
-        autoCaptureButton.setOnClickListener(v -> captureBothPagesAndCopy());
-        captureSummaryButton.setOnClickListener(v -> captureSummaryPage());
-        captureDetailButton.setOnClickListener(v -> captureDetailPageAndCopy());
-        previewButton.setOnClickListener(v -> showPreview());
-        shareButton.setOnClickListener(v -> sharePayload());
+        openGarminButton.setOnClickListener(v -> {
+            flashButton(openGarminButton, "開啟中...");
+            webView.loadUrl(GARMIN_ACTIVITIES_URL);
+        });
+        clearButton.setOnClickListener(v -> {
+            flashButton(clearButton, "清除中...");
+            clearCaptureState();
+        });
+        autoCaptureButton.setOnClickListener(v -> {
+            activateButton(autoCaptureButton, "處理中...");
+            captureBothPagesAndCopy();
+        });
+        captureSummaryButton.setOnClickListener(v -> {
+            activateButton(captureSummaryButton, "儲存中...");
+            captureSummaryPage();
+        });
+        captureDetailButton.setOnClickListener(v -> {
+            activateButton(captureDetailButton, "複製中...");
+            captureDetailPageAndCopy();
+        });
+        previewButton.setOnClickListener(v -> {
+            flashButton(previewButton, "開啟中...");
+            showPreview();
+        });
+        shareButton.setOnClickListener(v -> {
+            flashButton(shareButton, "分享中...");
+            sharePayload();
+        });
         backButton.setOnClickListener(v -> {
+            flashButton(backButton, "返回中...");
             if (webView.canGoBack()) {
                 webView.goBack();
             }
@@ -99,6 +126,7 @@ public class MainActivity extends Activity {
             if (!looksLikeActivitySummary(pageText)) {
                 statusText.setText("這不像 Garmin 活動數據頁。請先點進活動並等待資料載入。");
                 Toast.makeText(this, "請先開啟活動數據頁", Toast.LENGTH_SHORT).show();
+                resetActiveButton();
                 return;
             }
 
@@ -107,6 +135,7 @@ public class MainActivity extends Activity {
             lastPayload = buildCoachOsPayload(summaryPageUrl, "", summaryPageText, "");
             statusText.setText("已存數據分頁。請切到間歇訓練或計圈分頁，再按「存第二頁並複製」。");
             Toast.makeText(this, "已存數據分頁", Toast.LENGTH_SHORT).show();
+            resetActiveButton();
         });
     }
 
@@ -116,6 +145,7 @@ public class MainActivity extends Activity {
             if (!looksLikeActivitySummary(pageText)) {
                 statusText.setText("這不像 Garmin 活動頁。請先點進活動並等待資料載入。");
                 Toast.makeText(this, "請先開啟活動頁", Toast.LENGTH_SHORT).show();
+                resetActiveButton();
                 return;
             }
 
@@ -142,6 +172,7 @@ public class MainActivity extends Activity {
         if (summaryPageText.trim().isEmpty()) {
             statusText.setText("請先在數據分頁按「存數據分頁」。");
             Toast.makeText(this, "請先存數據分頁", Toast.LENGTH_SHORT).show();
+            resetActiveButton();
             return;
         }
 
@@ -150,6 +181,7 @@ public class MainActivity extends Activity {
             if (!looksLikeSplitTable(detailPageText)) {
                 statusText.setText("第二頁還沒有讀到間歇/計圈表格。請切到該分頁並等表格載入。");
                 Toast.makeText(this, "沒有讀到第二頁表格", Toast.LENGTH_SHORT).show();
+                resetActiveButton();
                 return;
             }
 
@@ -162,6 +194,7 @@ public class MainActivity extends Activity {
             copyPayload(lastPayload);
             statusText.setText("已複製數據分頁 + 第二頁內容，可貼到 ChatGPT / Claude / Gemini。");
             Toast.makeText(this, "已複製 CoachOS mRelay 內容", Toast.LENGTH_SHORT).show();
+            resetActiveButton();
         });
     }
 
@@ -207,6 +240,7 @@ public class MainActivity extends Activity {
             if (attempt >= AUTO_CAPTURE_MAX_ATTEMPTS) {
                 statusText.setText("還沒讀到間歇/計圈表格。請手動切到該分頁，再按「存第二頁並複製」。");
                 Toast.makeText(this, "自動擷取第二頁逾時", Toast.LENGTH_SHORT).show();
+                resetActiveButton();
                 return;
             }
 
@@ -224,6 +258,7 @@ public class MainActivity extends Activity {
         copyPayload(lastPayload);
         statusText.setText("已一鍵複製數據分頁 + 第二頁內容，可貼到 ChatGPT / Claude / Gemini。");
         Toast.makeText(this, "已一鍵複製 CoachOS mRelay 內容", Toast.LENGTH_SHORT).show();
+        resetActiveButton();
     }
 
     private void capturePageText(PageTextCallback callback) {
@@ -231,6 +266,7 @@ public class MainActivity extends Activity {
             if (pageText.trim().isEmpty()) {
                 statusText.setText("沒有讀到內容，請等 Garmin 頁面載入完成後再試。");
                 Toast.makeText(this, "沒有讀到內容", Toast.LENGTH_SHORT).show();
+                resetActiveButton();
                 return;
             }
 
@@ -282,6 +318,7 @@ public class MainActivity extends Activity {
         if (text.isEmpty()) {
             statusText.setText("目前沒有可預覽內容。請先存數據分頁。");
             Toast.makeText(this, "沒有可預覽內容", Toast.LENGTH_SHORT).show();
+            resetActiveButton();
             return;
         }
 
@@ -307,6 +344,7 @@ public class MainActivity extends Activity {
         if (text.isEmpty()) {
             statusText.setText("目前沒有可分享內容。請先完成擷取。");
             Toast.makeText(this, "沒有可分享內容", Toast.LENGTH_SHORT).show();
+            resetActiveButton();
             return;
         }
 
@@ -315,6 +353,38 @@ public class MainActivity extends Activity {
         sendIntent.putExtra(Intent.EXTRA_SUBJECT, "CoachOS mRelay Garmin Raw Activity");
         sendIntent.putExtra(Intent.EXTRA_TEXT, text);
         startActivity(Intent.createChooser(sendIntent, "分享 CoachOS mRelay 內容"));
+    }
+
+    private void flashButton(Button button, String temporaryText) {
+        activateButton(button, temporaryText);
+        mainHandler.postDelayed(() -> resetButtonIfStillActive(button), BUTTON_FLASH_MS);
+    }
+
+    private void activateButton(Button button, String temporaryText) {
+        resetActiveButton();
+        activeButton = button;
+        activeButtonOriginalText = button.getText().toString();
+        button.setBackgroundResource(R.drawable.button_primary);
+        button.setTextColor(BUTTON_TEXT_ACTIVE);
+        button.setText(temporaryText);
+    }
+
+    private void resetActiveButton() {
+        if (activeButton == null) {
+            return;
+        }
+
+        activeButton.setBackgroundResource(R.drawable.button_secondary);
+        activeButton.setTextColor(BUTTON_TEXT_DEFAULT);
+        activeButton.setText(activeButtonOriginalText);
+        activeButton = null;
+        activeButtonOriginalText = "";
+    }
+
+    private void resetButtonIfStillActive(Button button) {
+        if (activeButton == button) {
+            resetActiveButton();
+        }
     }
 
     private String cleanGarminText(String value) {

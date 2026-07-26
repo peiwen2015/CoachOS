@@ -62,6 +62,8 @@ h2 { font-size:clamp(32px, 5vw, 52px); letter-spacing:-.06em; line-height:1.05; 
 .step-card p { color:var(--muted); font-size:13px; margin:0; }
 .screenshot-section { border-top:1px solid var(--line); }
 .screenshots { display:grid; gap:34px 18px; grid-template-columns:repeat(3, 1fr); margin-top:54px; }
+.android-section { border-top:1px solid var(--line); padding-top:96px; }
+.android-shots { grid-template-columns:repeat(4, 1fr); }
 .screen-card { margin:0; }
 .screen-card img { background:#131313; border:1px solid #dce5e6; border-radius:16px; box-shadow:0 12px 26px #102a4312; display:block; height:auto; width:100%; }
 .screen-card figcaption { display:flex; gap:12px; padding:15px 4px 0; }
@@ -107,6 +109,7 @@ code { background:#102a4320; font-family:'DM Mono', monospace; font-size:.88em; 
   .section { padding:76px 0; }
   .steps,.split-section { grid-template-columns:1fr; }
   .screenshots { grid-template-columns:repeat(2, 1fr); gap:28px 12px; }
+  .android-shots { grid-template-columns:repeat(2, 1fr); }
   .screen-card img { border-radius:12px; }
   .step-card { min-height:190px; }
   .step-card h3 { margin-top:34px; }

@@ -45,8 +45,8 @@
 
     <section class="signal-bar">
       <div class="shell signal-inner">
-        <span>01</span><strong>開啟活動</strong><i></i>
-        <span>02</span><strong>切換分頁</strong><i></i>
+        <span>01</span><strong>連續擷取</strong><i></i>
+        <span>02</span><strong>手動切頁</strong><i></i>
         <span>03</span><strong>貼給 AI</strong>
       </div>
     </section>
@@ -55,11 +55,11 @@
       <div class="section-heading">
         <p class="eyebrow">HOW IT WORKS</p>
         <h2>三步，完成一次資料接力。</h2>
-        <p>你只需要在 Garmin Connect 裡做一次選擇，其餘由 mRelay 整理成 AI 看得懂的原始內容。</p>
+        <p>iOS Scriptable 版採連續擷取：先存數據分頁，再由你手動切到計圈／間歇訓練分頁，mRelay 會合併成 AI 看得懂的原始內容。</p>
       </div>
       <div class="steps">
-        <article class="step-card"><span class="step-number">01</span><h3>選活動</h3><p>執行腳本後，程式會開啟 Garmin Connect 活動列表。登入並點進要分析的活動。</p></article>
-        <article class="step-card"><span class="step-number">02</span><h3>選第二分頁</h3><p>先保留「數據」分頁，再切換到「計圈」或「間歇訓練」分頁，等表格載入後關閉。</p></article>
+        <article class="step-card"><span class="step-number">01</span><h3>連續擷取</h3><p>在 Scriptable 執行 CoachOS mRelay，選「連續擷取並複製」，再點進要分析的 Garmin 活動。</p></article>
+        <article class="step-card"><span class="step-number">02</span><h3>手動切第二頁</h3><p>數據分頁存好後，mRelay 會再次開同一活動。請手動切到「計圈」或「間歇訓練」後關閉。</p></article>
         <article class="step-card"><span class="step-number">03</span><h3>貼給 AI</h3><p>完整原始內容會自動複製到剪貼簿。開啟 ChatGPT、Claude 或 Gemini，貼上即可。</p></article>
       </div>
     </section>
@@ -67,34 +67,20 @@
     <section class="section screenshot-section shell" id="screenshots">
       <div class="section-heading">
         <p class="eyebrow">ON YOUR IPHONE</p>
-        <h2>照著畫面走，就不會迷路。</h2>
-        <p>以下截圖是實際操作順序。每次關閉 Garmin WebView 前，先確認目前停在正確的分頁。</p>
+        <h2>Scriptable 版，照著提示連續擷取。</h2>
+        <p>iOS 版需要你手動切到第二頁。影片示範完整流程：活動列表、數據分頁、手動切到計圈／間歇訓練、完成複製。</p>
       </div>
-      <div class="screenshots">
-        <figure class="screen-card">
-          <img src="assets/screens/S__32907267_0.jpg" alt="Scriptable 中的 CoachOS mRelay 啟動提示" loading="lazy">
-          <figcaption><span>01</span><div><b>啟動 mRelay</b><small>在 Scriptable 點擊 CoachOS mRelay，按「開啟 Garmin」。</small></div></figcaption>
-        </figure>
-        <figure class="screen-card">
-          <img src="assets/screens/S__32907268_0.jpg" alt="Garmin Connect 活動列表" loading="lazy">
-          <figcaption><span>02</span><div><b>選擇活動</b><small>在活動列表點進要分析的跑步活動。</small></div></figcaption>
-        </figure>
-        <figure class="screen-card">
-          <img src="assets/screens/S__32907269_0.jpg" alt="Garmin Connect 活動數據頁" loading="lazy">
-          <figcaption><span>03</span><div><b>保留數據分頁</b><small>等摘要內容載入完成，再關閉 Garmin WebView。</small></div></figcaption>
-        </figure>
-        <figure class="screen-card">
-          <img src="assets/screens/S__32907270_0.jpg" alt="Scriptable 提示切換到計圈或間歇訓練分頁" loading="lazy">
-          <figcaption><span>04</span><div><b>準備第二次讀取</b><small>按下「開啟計圈／間歇訓練」，回到同一個活動頁。</small></div></figcaption>
-        </figure>
-        <figure class="screen-card">
-          <img src="assets/screens/S__32907271_0.jpg" alt="Garmin Connect 間歇訓練分頁表格" loading="lazy">
-          <figcaption><span>05</span><div><b>切換資料分頁</b><small>選擇「計圈」或「間歇訓練」，不要選第三個「區段」。</small></div></figcaption>
-        </figure>
-        <figure class="screen-card">
-          <img src="assets/screens/S__32907272_0.jpg" alt="CoachOS mRelay 完成並複製到剪貼簿" loading="lazy">
-          <figcaption><span>06</span><div><b>貼給 AI</b><small>看到完成提示後，開啟常用 AI，進入 Project／對話並貼上。</small></div></figcaption>
-        </figure>
+      <div class="ios-video-card">
+        <video class="ios-flow-video" controls muted playsinline preload="metadata">
+          <source src="assets/ios/ios-guided-capture-flow.mp4" type="video/mp4">
+          你的瀏覽器不支援內嵌影片播放。
+        </video>
+        <div class="flow-points">
+          <span>01 活動列表</span>
+          <span>02 數據分頁</span>
+          <span>03 手動切第二頁</span>
+          <span>04 複製完成</span>
+        </div>
       </div>
     </section>
 

@@ -12,11 +12,17 @@ const K_CP     = 'coachOS_cp';
 const K_SHOES  = 'coachOS_shoes';
 const K_COURSE = 'coachOS_courseType';
 const K_GOAL   = 'coachOS_goal';
+const K_MRELAY_SUMMARY_TEXT = 'coachOS_mrelay_summaryText';
+const K_MRELAY_SUMMARY_URL  = 'coachOS_mrelay_summaryUrl';
+const K_MRELAY_DETAIL_TEXT  = 'coachOS_mrelay_detailText';
+const K_MRELAY_DETAIL_URL   = 'coachOS_mrelay_detailUrl';
+const K_MRELAY_LAST_PAYLOAD = 'coachOS_mrelay_lastPayload';
 
 function kGet(key, def) {
   return Keychain.contains(key) ? Keychain.get(key) : (def || '');
 }
 function kSet(key, val) { if (val) Keychain.set(key, String(val)); }
+function kPut(key, val) { Keychain.set(key, String(val || '')); }
 
 function extractActivityId(url) {
   const m = url.match(/\/activity\/(\d+)/);
@@ -650,143 +656,286 @@ function buildMarkdown(d, course, subj, weather, laps) {
 }
 
 // ============================================================
-// 主程式：依序讀取「數據」與「計圈／間歇訓練」原始 DOM → 合併複製
+// mRelay 面板：連續擷取、手動切換第二頁、預覽與分享
 // ============================================================
 
-async function captureTab1(activityId) {
-  const wv = new WebView();
-  await wv.loadURL('https://connect.garmin.com/modern/activity/' + activityId);
-  await wv.present(false);
-  return await wv.evaluateJavaScript(
-    "document.body ? document.body.innerText.slice(0, 15000) : ''"
-  );
+function hasStored(key) {
+  return !!String(kGet(key, '') || '').trim();
 }
 
-async function captureTab2(activityId) {
-  const wv = new WebView();
-  await wv.loadURL('https://connect.garmin.com/modern/activity/' + activityId);
-  await wv.present(false);
+function clearRelayState() {
+  kPut(K_MRELAY_SUMMARY_TEXT, '');
+  kPut(K_MRELAY_SUMMARY_URL, '');
+  kPut(K_MRELAY_DETAIL_TEXT, '');
+  kPut(K_MRELAY_DETAIL_URL, '');
+  kPut(K_MRELAY_LAST_PAYLOAD, '');
+}
 
+function normalizeActivityUrl(url) {
+  const activityId = extractActivityId(String(url || ''));
+  return activityId ? 'https://connect.garmin.com/app/activity/' + activityId : String(url || '');
+}
+
+function looksLikeActivityPage(text) {
+  const s = String(text || '');
+  return s.length > 100 && /距離/.test(s) && /時間/.test(s) && /平均配速|平均速度|卡路里/.test(s);
+}
+
+function looksLikeDetailPage(text) {
+  const s = String(text || '');
+  return s.length > 100;
+}
+
+function buildRawPayload(summaryUrl, detailUrl, summaryText, detailText) {
+  return [
+    '# CoachOS mRelay Garmin Raw Activity',
+    '',
+    '## Scriptable App 擷取資訊',
+    '- 數據分頁 URL: ' + normalizeActivityUrl(summaryUrl),
+    '- 第二分頁 URL: ' + normalizeActivityUrl(detailUrl || summaryUrl),
+    '- Capture Time: ' + new Date().toISOString(),
+    '',
+    '## 數據分頁原始文字',
+    String(summaryText || '').trim(),
+    '',
+    '## 計圈／間歇訓練分頁原始文字',
+    String(detailText || '').trim(),
+    '',
+    '## 使用提醒',
+    '請依 Garmin 頁面中的今天、昨天、星期幾與本次擷取日期還原實際活動日期。'
+  ].join('\n');
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+async function showMessage(title, message) {
+  const alert = new Alert();
+  alert.title = title;
+  alert.message = message;
+  alert.addAction('OK');
+  await alert.present();
+}
+
+async function readSnapshot(wv) {
+  const raw = await wv.evaluateJavaScript(`(() => {
+    return JSON.stringify({
+      href: location.href,
+      body: document.body ? document.body.innerText.slice(0, 20000) : ''
+    });
+  })()`);
+  try {
+    return JSON.parse(raw || '{}');
+  } catch (e) {
+    return { href: '', body: String(raw || '') };
+  }
+}
+
+async function readDetailSnapshot(wv) {
   const raw = await wv.evaluateJavaScript(`(() => {
     const body = document.body ? document.body.innerText : '';
     const tables = Array.from(document.querySelectorAll('table'))
       .map(table => table.innerText || '')
-      .filter(text => /平均配速|計圈|間隔/.test(text));
-    return JSON.stringify({ body: body.slice(0, 15000), tables });
+      .filter(text => /平均配速|計圈|間隔|步驟類型|最大心率/.test(text));
+    return JSON.stringify({
+      href: location.href,
+      body: body.slice(0, 20000),
+      tables
+    });
   })()`);
 
   try {
     const data = JSON.parse(raw || '{}');
     const table = Array.isArray(data.tables)
       ? data.tables
-          .filter(text => /平均配速|計圈|間隔/.test(text))
+          .filter(text => /平均配速|計圈|間隔|步驟類型|最大心率/.test(text))
           .sort((a, b) => b.length - a.length)[0]
       : '';
-    return table || data.body || '';
+    return {
+      href: data.href || '',
+      text: table || data.body || ''
+    };
   } catch (e) {
-    return raw || '';
+    return { href: '', text: raw || '' };
   }
 }
 
+function saveSummary(snapshot) {
+  const href = String(snapshot.href || '').trim();
+  const text = String(snapshot.body || '').trim();
+  if (!extractActivityId(href)) {
+    throw new Error('找不到活動網址，請先點進 Garmin 活動頁再關閉 WebView。');
+  }
+  if (!looksLikeActivityPage(text)) {
+    throw new Error('無法辨識數據分頁內容，請等活動頁完整載入後再關閉 WebView。');
+  }
+  kPut(K_MRELAY_SUMMARY_URL, href);
+  kPut(K_MRELAY_SUMMARY_TEXT, text);
+  return { href, text };
+}
+
+async function finalizeCapture(detail) {
+  const summaryUrl = kGet(K_MRELAY_SUMMARY_URL, '');
+  const summaryText = kGet(K_MRELAY_SUMMARY_TEXT, '');
+  const detailUrl = String(detail.href || summaryUrl);
+  const detailText = String(detail.text || '').trim();
+  if (!looksLikeDetailPage(detailText)) {
+    throw new Error('第二頁內容太短，請確認頁面載入完成後再關閉。');
+  }
+
+  kPut(K_MRELAY_DETAIL_URL, detailUrl);
+  kPut(K_MRELAY_DETAIL_TEXT, detailText);
+
+  const payload = buildRawPayload(summaryUrl, detailUrl, summaryText, detailText);
+  kPut(K_MRELAY_LAST_PAYLOAD, payload);
+  Pasteboard.copyString(payload);
+
+  await showMessage(
+    'CoachOS mRelay 完成',
+    '數據分頁 + 第二頁內容已複製到剪貼簿。\n\n接下來可直接貼到 ChatGPT / Claude / Gemini。'
+  );
+}
+
+async function openGarminAction() {
+  const wv = new WebView();
+  await wv.loadURL('https://connect.garmin.com/app/activities');
+  await wv.present(false);
+}
+
+async function saveSummaryAction() {
+  const wv = new WebView();
+  await wv.loadURL('https://connect.garmin.com/app/activities');
+  await wv.present(false);
+  saveSummary(await readSnapshot(wv));
+  await showMessage('已存數據分頁', '請切到計圈／間歇訓練或計圈分頁，再執行「存第二頁並複製」。');
+}
+
+async function saveDetailAction() {
+  const summaryUrl = kGet(K_MRELAY_SUMMARY_URL, '');
+  if (!summaryUrl) {
+    await showMessage('尚未有數據分頁', '請先執行「存數據分頁」或「連續擷取並複製」。');
+    return;
+  }
+
+  const wv = new WebView();
+  await wv.loadURL(summaryUrl);
+  await wv.present(false);
+  await finalizeCapture(await readDetailSnapshot(wv));
+}
+
+async function guidedCaptureAction() {
+  const guide = new Alert();
+  guide.title = '連續擷取並複製';
+  guide.message = '接下來會分兩段擷取：\n\n1. 先開 Garmin 活動列表，請點進要分析的活動，停在數據分頁後關閉。\n2. mRelay 會再開同一活動，請手動切到「計圈」或「間歇訓練」分頁後關閉。\n\n完成後會自動合併並複製。';
+  guide.addAction('開始');
+  guide.addCancelAction('取消');
+  if (await guide.present() === -1) return;
+
+  const wv = new WebView();
+  await wv.loadURL('https://connect.garmin.com/app/activities');
+  await wv.present(false);
+
+  saveSummary(await readSnapshot(wv));
+
+  const fallback = new Alert();
+  fallback.title = '請手動切到第二頁';
+  fallback.message = '已存好數據分頁。\n\n下一步會開同一活動頁，請手動切到「計圈」或「間歇訓練」分頁，等表格載入後關閉。mRelay 會接著合併並複製完整內容。';
+  fallback.addAction('開第二頁並繼續');
+  fallback.addCancelAction('稍後');
+  if (await fallback.present() !== -1) {
+    await saveDetailAction();
+  }
+}
+
+async function previewAction() {
+  const payload = kGet(K_MRELAY_LAST_PAYLOAD, '');
+  if (!payload) {
+    await showMessage('沒有可預覽內容', '請先完成擷取。');
+    return;
+  }
+
+  const html = [
+    '<!doctype html><meta name="viewport" content="width=device-width, initial-scale=1">',
+    '<style>',
+    'body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f8f1e7;color:#102b40;margin:0;padding:20px;}',
+    'h1{font-size:22px;margin:0 0 14px;}',
+    'pre{white-space:pre-wrap;word-break:break-word;background:#fff;border:1px solid #e2d8ca;border-radius:16px;padding:16px;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;}',
+    '</style><h1>CoachOS mRelay Preview</h1><pre>',
+    escapeHtml(payload),
+    '</pre>'
+  ].join('');
+
+  const wv = new WebView();
+  await wv.loadHTML(html);
+  await wv.present(false);
+}
+
+async function shareAction() {
+  const payload = kGet(K_MRELAY_LAST_PAYLOAD, '');
+  if (!payload) {
+    await showMessage('沒有可分享內容', '請先完成擷取。');
+    return;
+  }
+
+  Pasteboard.copyString(payload);
+  if (typeof ShareSheet !== 'undefined') {
+    await ShareSheet.present([payload]);
+  } else {
+    await showMessage('已複製', 'Scriptable 目前無法開啟分享面板，但內容已複製到剪貼簿。');
+  }
+}
+
+async function showMenu() {
+  const summaryReady = hasStored(K_MRELAY_SUMMARY_TEXT);
+  const detailReady = hasStored(K_MRELAY_DETAIL_TEXT);
+  const payloadReady = hasStored(K_MRELAY_LAST_PAYLOAD);
+
+  const menu = new Alert();
+  menu.title = 'CoachOS mRelay';
+  menu.message = [
+    '選擇要執行的動作。',
+    'Scriptable 版第二頁需要手動切換。',
+    '',
+    '數據分頁：' + (summaryReady ? '已存' : '尚未'),
+    '第二頁：' + (detailReady ? '已存' : '尚未'),
+    '可分享內容：' + (payloadReady ? '已建立' : '尚未')
+  ].join('\n');
+  menu.addAction('開 Garmin');
+  menu.addAction('連續擷取並複製');
+  menu.addAction('存數據分頁');
+  menu.addAction('存第二頁並複製');
+  menu.addAction('預覽');
+  menu.addAction('分享');
+  menu.addAction('清除');
+  menu.addCancelAction('關閉');
+  return await menu.present();
+}
+
 async function main() {
-  try {
-    const intro = new Alert();
-    intro.title = 'CoachOS mRelay';
-    intro.message = '即將開啟 Garmin Connect。請登入（若需要），點進今天的活動，停在「數據」分頁，等內容載入完成後關閉。';
-    intro.addAction('開啟 Garmin');
-    intro.addCancelAction('取消');
-    if (await intro.present() === -1) return;
+  while (true) {
+    const choice = await showMenu();
+    if (choice === -1) return;
 
-    // 第一次開啟活動列表，由使用者登入並選取活動。
-    const wv1 = new WebView();
-    await wv1.loadURL('https://connect.garmin.com/app/activities');
-    await wv1.present(false);
-
-    const selectionRaw = await wv1.evaluateJavaScript(`(() => {
-      return JSON.stringify({
-        href: location.href,
-        body: document.body ? document.body.innerText.slice(0, 15000) : ''
-      });
-    })()`);
-    let selection = {};
-    try { selection = JSON.parse(selectionRaw || '{}'); } catch (e) {}
-
-    const activityUrl = String(selection.href || '').trim();
-    const activityId = extractActivityId(activityUrl);
-    if (!activityId) {
-      throw new Error('找不到活動網址，請在第一次關閉前先點進今天的活動頁');
-    }
-
-    const tab1 = selection.body || '';
-    if (!tab1 || tab1.length < 100) {
-      throw new Error('無法讀取「數據」分頁，請確認活動頁已完整載入再關閉');
-    }
-
-    const guide = new Alert();
-    guide.title = '數據分頁已完成';
-    guide.message = '接下來會再次開啟同一活動頁。請切換到「計圈」或「間歇訓練」分頁後再關閉。\n\n請不要選第三個「區段」分頁。';
-    guide.addAction('開啟計圈／間歇訓練');
-    await guide.present();
-
-    // 第二次開啟同一活動頁，Tab 名稱不固定，以表格內容判斷。
-    const wv2 = new WebView();
-    await wv2.loadURL(activityUrl);
-    await wv2.present(false);
-    const tab2Raw = await wv2.evaluateJavaScript(`(() => {
-      const body = document.body ? document.body.innerText : '';
-      const tables = Array.from(document.querySelectorAll('table'))
-        .map(table => table.innerText || '')
-        .filter(text => /平均配速|計圈|間隔/.test(text));
-      return JSON.stringify({ body: body.slice(0, 15000), tables });
-    })()`);
-
-    let tab2 = '';
     try {
-      const data = JSON.parse(tab2Raw || '{}');
-      const table = Array.isArray(data.tables)
-        ? data.tables
-            .filter(text => /平均配速|計圈|間隔/.test(text))
-            .sort((a, b) => b.length - a.length)[0]
-        : '';
-      tab2 = table || data.body || '';
+      if (choice === 0) await openGarminAction();
+      if (choice === 1) await guidedCaptureAction();
+      if (choice === 2) await saveSummaryAction();
+      if (choice === 3) await saveDetailAction();
+      if (choice === 4) await previewAction();
+      if (choice === 5) await shareAction();
+      if (choice === 6) {
+        clearRelayState();
+        await showMessage('已清除', '暫存的分頁內容與上次輸出已清除。');
+      }
     } catch (e) {
-      tab2 = tab2Raw || '';
+      await showMessage('錯誤', String(e) + (e.stack ? '\n\n' + e.stack.slice(0, 300) : ''));
     }
-    if (!tab2 || tab2.length < 100) {
-      throw new Error('無法讀取「計圈／間歇訓練」分頁，請切換到該分頁後再關閉');
-    }
-
-    const output = [
-      '# CoachOS mRelay Garmin Raw Activity',
-      '**活動網址：** ' + activityUrl,
-      '',
-      '請直接根據以下 Garmin Connect 原始內容分析，不要假設缺失欄位，也不要把欄位位置當成固定格式。',
-      '日期判讀規則：Garmin 會將今天顯示為「今天」、昨天顯示為「昨天」、同一週較早活動顯示為星期幾，更早活動才顯示完整日期；請依本次執行日期還原實際日期。',
-      '',
-      '## 數據分頁原始 DOM',
-      '```text',
-      tab1,
-      '```',
-      '',
-      '## 計圈／間歇訓練分頁原始 DOM',
-      '```text',
-      tab2,
-      '```',
-    ].join('\n');
-    Pasteboard.copyString(output);
-
-    const done = new Alert();
-    done.title = '✅ CoachOS mRelay 完成';
-    done.message = '「數據」與「計圈／間歇訓練」分頁原始內容已複製到剪貼簿。\n\n接下來請開啟你常用的 AI，例如 ChatGPT、Claude 或 Gemini，進入要使用的 Project／對話，再貼上內容進行分析。';
-    done.addAction('👌 好的');
-    await done.present();
-
-  } catch(e) {
-    const err = new Alert();
-    err.title = '❌ 錯誤';
-    err.message = String(e) + (e.stack ? '\n\n' + e.stack.slice(0, 300) : '');
-    err.addAction('OK');
-    await err.present();
   }
 }
 

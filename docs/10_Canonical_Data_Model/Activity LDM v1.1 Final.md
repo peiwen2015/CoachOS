@@ -74,6 +74,7 @@ weather_description
 ```text
 max_hr
 avg_hr
+avg_power_w
 critical_power_w
 training_effect_aerobic
 training_effect_anaerobic
@@ -151,4 +152,3 @@ Validated against:
 - `LDM Validation Round 1 - activity`
 
 Status: Final
-

@@ -54,6 +54,7 @@ The goal of this log is to prevent us from hiding context problems behind more `
 | CG-015 | Journey | 2026-04 | 負荷建構 | 穩定累積 | NE-JNY-STB-001 | `current_chapter=load_build`; `turning_points=0` | Same conflict as 2026-05 | Build sequence continuity | Preserve build chapter identity | Multi-period direction | Derivable | P1 | Open | Repeated chapter compression |
 | CG-016 | Journey | 2026-03 | 負荷建構 | 穩定累積 | NE-JNY-STB-001 | `current_chapter=load_build`; `turning_points=2` | Turning points exist, but engine still collapses story into “stable accumulation” | Early build milestone significance; chapter transition from foundation | Reclassify to load build with milestone-aware chapter language | Turning-point weighting; chapter transition context | Derivable | P1 | Open | Turning points need to affect interpretation, not just evidence |
 | CG-017 | Journey | 2026-02 | 基礎建立 | 穩定累積 | NE-JNY-STB-001 | `current_chapter=foundation`; `turning_points=0` | Engine loses the distinction between foundation and generic stability | Early-stage chapter identity; runner phase | Reclassify to foundation chapter | Current training phase; chapter ontology | Existing + derivable | P1 | Open | Chapter ontology likely belongs in context injection, not voice |
+| CG-018 | Weekly | Fixed-week current period | 本週進度 | 正式週回顧 | — | `latest_activity_date` falls before configured week end | An unfinished fixed week must not be compared with closed weeks or receive a formal verdict | Week boundary mode; week start/end; elapsed days; period completeness | Separate progress snapshot from closed-week interpretation | Semantic period metadata; settings | Existing / derivable | P1 | Open | Product rule: incomplete fixed weeks are excluded from formal weekly review |
 
 ## Consolidated Context Backlog
 
@@ -62,6 +63,7 @@ The goal of this log is to prevent us from hiding context problems behind more `
 | Context Type | Why It Matters | Affected Gaps | Source | Availability | Suggested v0.2 Priority |
 |---|---|---|---|---|---|
 | `period_completeness` | Partial weeks and months should not be interpreted like closed periods | CG-002, CG-004, CG-008 | Semantic / period metadata | Existing | 1 |
+| `week_boundary_mode` | Rolling and fixed-week windows answer different review questions | CG-018 | User setting / semantic period metadata | Derivable | 1 |
 | `previous_theme` | Lets the engine read build → absorb → reintroduce as a sequence instead of isolated facts | CG-001, CG-002, CG-008, CG-013 | Previous narrative object | Existing | 2 |
 | `previous_recommendation` | Preserves coaching continuity and explains cautionary reads that the raw signals miss | CG-007, CG-013 | Previous narrative object | Existing | 3 |
 | `long_run_continuity` | Distinguishes “load down but endurance alive” from true decline | CG-001, CG-013 | Semantic Layer | Existing / derivable | 4 |
@@ -79,11 +81,12 @@ The first context-injection pass should stay small.
 Recommended first batch:
 
 1. `period_completeness`
-2. `previous_theme`
-3. `previous_recommendation`
-4. `long_run_continuity`
-5. `quality_session_return`
-6. `multi_period_direction`
+2. `week_boundary_mode`
+3. `previous_theme`
+4. `previous_recommendation`
+5. `long_run_continuity`
+6. `quality_session_return`
+7. `multi_period_direction`
 
 These six context types should resolve most of the highest-visibility mismatches without expanding the frozen Narrative Object schema.
 

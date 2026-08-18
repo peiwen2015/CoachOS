@@ -106,7 +106,12 @@ Monthly answers:
 
 Weekly would answer:
 
-`這七天，身體真正學會了什麼？`
+`這個完整週期，身體真正學會了什麼？`
+
+When fixed-week mode is selected and the current week is not complete, Weekly
+does not answer this question yet. It shows a separate `本週進度` snapshot with
+the week boundary, latest data date, elapsed days, activity count, distance,
+and load. The snapshot must not issue a weekly verdict or recommendation.
 
 ## Natural Reading Sequence
 
@@ -125,6 +130,10 @@ If Q2 holds, Weekly may grow in this order:
 This is not yet a layout.
 
 It is only the first candidate reading sequence implied by Q2.
+
+The sequence applies to a completed review period. For an unfinished fixed
+week, the page stops at accumulation progress and defers learning, cause,
+evidence, and next-week interpretation until the period closes.
 
 ## Relationship to Q1
 

@@ -1,0 +1,140 @@
+{
+  "chart_id": "activity_decoupling",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "available",
+  "title": "配速與心率解耦",
+  "decision_question": "這次跑步後段是否失去穩定性？",
+  "period": {
+    "start_date": "2026-07-18",
+    "end_date": "2026-07-18",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {
+    "first_half_avg_pace_sec_per_km": 315,
+    "second_half_avg_pace_sec_per_km": 325,
+    "first_half_avg_hr": 145,
+    "second_half_avg_hr": 155,
+    "pace_change_pct": 3.2,
+    "heart_rate_change_pct": 6.9,
+    "aerobic_decoupling_pct": 10.1,
+    "sample_quality_status": "sufficient"
+  },
+  "axes": {
+    "x": { "label": "時間", "unit": "split", "scale": "ordinal" },
+    "y_left": { "label": "配速", "unit": "sec_per_km", "scale": "linear" },
+    "y_right": { "label": "心率", "unit": "bpm", "scale": "linear" }
+  },
+  "series": [
+    {
+      "series_id": "pace",
+      "label": "配速",
+      "type": "line",
+      "unit": "sec_per_km",
+      "axis": "left",
+      "display_precision": 0,
+      "hidden_by_default": false,
+      "source_method": "activity_timeseries_view",
+      "data_quality_status": "available",
+      "points": [
+        { "x": "1", "y": 311, "status": "available", "source": "activity_decoupling_view" },
+        { "x": "2", "y": 313, "status": "available", "source": "activity_decoupling_view" },
+        { "x": "3", "y": 318, "status": "available", "source": "activity_decoupling_view" },
+        { "x": "4", "y": 323, "status": "available", "source": "activity_decoupling_view" }
+      ]
+    },
+    {
+      "series_id": "heart_rate",
+      "label": "心率",
+      "type": "line",
+      "unit": "bpm",
+      "axis": "right",
+      "display_precision": 0,
+      "hidden_by_default": false,
+      "source_method": "activity_timeseries_view",
+      "data_quality_status": "available",
+      "points": [
+        { "x": "1", "y": 142, "status": "available", "source": "activity_decoupling_view" },
+        { "x": "2", "y": 144, "status": "available", "source": "activity_decoupling_view" },
+        { "x": "3", "y": 151, "status": "available", "source": "activity_decoupling_view" },
+        { "x": "4", "y": 156, "status": "available", "source": "activity_decoupling_view" }
+      ]
+    }
+  ],
+  "reference_bands": [
+    {
+      "band_id": "stable_drift_band",
+      "label": "穩定區間",
+      "axis": "left",
+      "start_x": "1",
+      "end_x": "4",
+      "lower": 0,
+      "upper": 5,
+      "unit": "%",
+      "status": "available",
+      "method": "stability_threshold_v0.1"
+    }
+  ],
+  "annotations": [
+    {
+      "annotation_id": "heat_warning",
+      "type": "warning",
+      "x": "3",
+      "label": "心率開始上升",
+      "detail": "後段出現明顯漂移",
+      "rule_id": "decoupling_warning_v0.1",
+      "severity": "medium"
+    }
+  ],
+  "verdict": {
+    "status": "warning",
+    "code": "CLEAR_DRIFT",
+    "headline": "後段效率開始下降",
+    "message": "後半段配速變慢、心率升高，顯示明顯的有氧漂移。",
+    "confidence": "high",
+    "rule_id": "activity_decoupling_v0.1",
+    "evidence": [
+      { "metric": "aerobic_decoupling_pct", "value": 10.1, "unit": "%" }
+    ],
+    "limitations": [
+      "路線與溫度會影響漂移結果"
+    ]
+  },
+  "data_quality": {
+    "overall_status": "available",
+    "completeness_score": 0.94,
+    "confidence": "high",
+    "missing_fields": [],
+    "estimated_fields": [],
+    "invalid_fields": [],
+    "coverage": {
+      "heart_rate_pct": 97,
+      "pace_pct": 100,
+      "split_pct": 100
+    },
+    "limitations": []
+  },
+  "drill_down": {
+    "enabled": true,
+    "target_type": "activity",
+    "target_id": "activity_9921",
+    "fields": [
+      "split_index",
+      "split_distance_m",
+      "elapsed_time_sec",
+      "avg_hr",
+      "avg_power_w",
+      "elevation_gain_m"
+    ],
+    "notes": [
+      "點擊後可查看每公里或每段的細節"
+    ]
+  },
+  "empty_state": {
+    "title": "目前沒有足夠資料",
+    "message": "這張圖需要足夠的分段或樣本資料。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

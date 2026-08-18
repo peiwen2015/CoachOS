@@ -162,7 +162,7 @@ Source LDM: `Shoe LDM v1.1 Final`
 | retire_date | retire_date | TEXT | NULL | ISO8601 date |
 | retire_target_distance_km | retire_target_distance_km | REAL | NULL CHECK (retire_target_distance_km IS NULL OR retire_target_distance_km >= 0) | Optional lifecycle target |
 | retire_actual_distance_km | retire_actual_distance_km | REAL | NULL CHECK (retire_actual_distance_km IS NULL OR retire_actual_distance_km >= 0) | Optional lifecycle outcome |
-| is_active | is_active | INTEGER | NOT NULL CHECK (is_active IN (0, 1)) | Active rotation flag |
+| is_active | is_active | INTEGER | NOT NULL CHECK (is_active IN (0, 1)) | Active rotation flag; manual lifecycle state preserved by FIT imports |
 | notes | notes | TEXT | NULL | Optional notes |
 | created_at | created_at | TEXT | NOT NULL DEFAULT CURRENT_TIMESTAMP | System timestamp |
 | updated_at | updated_at | TEXT | NOT NULL DEFAULT CURRENT_TIMESTAMP | System timestamp |
@@ -260,6 +260,7 @@ Source LDM: `Activity LDM v1.1 Final`
 | weather_description | weather_description | TEXT | NULL | Weather description |
 | max_hr | max_hr | INTEGER | NULL CHECK (max_hr IS NULL OR max_hr BETWEEN 30 AND 240) | Max HR setting/source value |
 | avg_hr | avg_hr | INTEGER | NULL CHECK (avg_hr IS NULL OR avg_hr BETWEEN 30 AND 240) | Activity average HR |
+| avg_power_w | avg_power_w | INTEGER | NULL CHECK (avg_power_w IS NULL OR avg_power_w >= 0) | Official FIT session average power; never derived from split power |
 | critical_power_w | critical_power_w | INTEGER | NULL CHECK (critical_power_w IS NULL OR critical_power_w > 0) | Critical power / FTP-like value |
 | training_effect_aerobic | training_effect_aerobic | REAL | NULL CHECK (training_effect_aerobic IS NULL OR training_effect_aerobic BETWEEN 0 AND 5) | Garmin TE aerobic |
 | training_effect_anaerobic | training_effect_anaerobic | REAL | NULL CHECK (training_effect_anaerobic IS NULL OR training_effect_anaerobic BETWEEN 0 AND 5) | Garmin TE anaerobic |

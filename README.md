@@ -33,6 +33,7 @@ CoachOS 現在主要提供四個產品面：
 - `Weekly`：這週真正留下來的是什麼？
 - `Monthly`：這個月最後建立了什麼？
 - `Metadata / Settings`：補標註、修正來源、管理鞋款與課表對照
+- `Shoes`：點擊鞋款可查看鞋款摘要與所有已追蹤活動，並可從活動清單進入單堂活動判讀
 - `AI 延伸分析`：把整理好的內容交給外部 AI 繼續分析，結果也能寫回頁面
 
 `Journey` 目前保留在程式裡，但暫時不作為公開產品面。
@@ -171,7 +172,7 @@ docs/      架構與產品文件
 - `Weekly`：Stable，已讀取 confirmed 教練知識與訓練序列理解，並支援 AI 交棒 / 週圖卡 prompt
 - `Monthly`：Stable，已讀取 confirmed 教練知識與訓練序列理解，並支援 AI 交棒 / 月圖卡 prompt
 - `Metadata / Settings`：Stable，已具備建議值、provenance、補標註與鞋款狀態管理
-- `Shoes`：Beta，已可進行鞋款狀態調整，但仍會持續收斂
+- `Shoes`：Beta，已具備鞋款狀態調整、鞋款摘要與已追蹤活動明細；仍會持續收斂鞋款適配分析
 
 ---
 

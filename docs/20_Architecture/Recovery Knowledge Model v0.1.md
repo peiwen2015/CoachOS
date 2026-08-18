@@ -93,6 +93,11 @@ Important recovery context includes:
 - whether disruption was planned or forced
 - whether environmental stress is present
 
+Period completeness is a boundary condition, not merely another recovery
+signal. A partial fixed week may show accumulated training progress, but it
+must not be labeled as a completed recovery week or used as a full-week
+comparison baseline.
+
 ## Interpretation
 
 The coach should not ask only:

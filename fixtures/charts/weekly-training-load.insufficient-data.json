@@ -1,0 +1,62 @@
+{
+  "chart_id": "weekly_training_load",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "insufficient_data",
+  "title": "週訓練負荷趨勢",
+  "decision_question": "最近的訓練負荷是否穩定且合理？",
+  "period": {
+    "start_date": "2026-06-29",
+    "end_date": "2026-07-19",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {},
+  "axes": {},
+  "series": [],
+  "reference_bands": [],
+  "annotations": [],
+  "verdict": {
+    "status": "unknown",
+    "code": "LOAD_INSUFFICIENT",
+    "headline": "資料不足，暫時無法判讀負荷趨勢",
+    "message": "目前可用週數太少，還無法建立可靠的趨勢與基準。",
+    "confidence": "low",
+    "rule_id": "weekly_load_insufficient_v0.1",
+    "evidence": [],
+    "limitations": [
+      "至少需要 4 週以上可用資料"
+    ]
+  },
+  "data_quality": {
+    "overall_status": "insufficient_data",
+    "completeness_score": 0.18,
+    "confidence": "low",
+    "missing_fields": [
+      "training_load_history"
+    ],
+    "estimated_fields": [],
+    "invalid_fields": [],
+    "coverage": {
+      "training_load_pct": 18,
+      "distance_pct": 100,
+      "duration_pct": 100
+    },
+    "limitations": [
+      "歷史週數不足"
+    ]
+  },
+  "drill_down": {
+    "enabled": false,
+    "target_type": "week",
+    "target_id": null,
+    "fields": [],
+    "notes": []
+  },
+  "empty_state": {
+    "title": "資料還不夠",
+    "message": "先累積更多完整訓練週期，這張圖才會可靠。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

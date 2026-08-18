@@ -1,0 +1,137 @@
+{
+  "chart_id": "workout_completion",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "available",
+  "title": "課表目標與實際完成",
+  "decision_question": "這堂課是否按原定課表完成？",
+  "analysis_mode": "goal_vs_actual",
+  "planned_data_status": "authoritative",
+  "workout_source": "coachos",
+  "alignment_method": "exact_step_reference",
+  "alignment_confidence": "high",
+  "period": {
+    "start_date": "2026-07-20",
+    "end_date": "2026-07-20",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {
+    "planned_segments": 12,
+    "completed_segments": 11,
+    "target_compliance_pct": 92.4,
+    "late_session_fade_pct": 5.8,
+    "missed_targets": 1,
+    "best_block_compliance_pct": 98.0,
+    "worst_block_compliance_pct": 71.5
+  },
+  "axes": {
+    "x": { "label": "區段", "unit": "segment", "scale": "ordinal" },
+    "y_left": { "label": "配速 / 努力", "unit": "sec_per_km|bpm|w", "scale": "linear" }
+  },
+  "series": [
+    {
+      "series_id": "target_pace_band",
+      "label": "目標配速區間",
+      "type": "band",
+      "unit": "sec_per_km",
+      "axis": "left",
+      "display_precision": 0,
+      "hidden_by_default": false,
+      "source_method": "coachos_planned",
+      "data_quality_status": "available",
+      "points": []
+    },
+    {
+      "series_id": "actual_pace",
+      "label": "實際配速",
+      "type": "line",
+      "unit": "sec_per_km",
+      "axis": "left",
+      "display_precision": 0,
+      "hidden_by_default": false,
+      "source_method": "coachos_derived",
+      "data_quality_status": "available",
+      "points": [
+        { "x": "1", "y": 320, "status": "available", "source": "workout_execution_segment_view" },
+        { "x": "2", "y": 314, "status": "available", "source": "workout_execution_segment_view" },
+        { "x": "3", "y": 311, "status": "available", "source": "workout_execution_segment_view" }
+      ]
+    }
+  ],
+  "reference_bands": [
+    {
+      "band_id": "target_pace_range",
+      "label": "課表目標區間",
+      "axis": "left",
+      "start_x": "1",
+      "end_x": "12",
+      "lower": 308,
+      "upper": 318,
+      "unit": "sec_per_km",
+      "status": "available",
+      "method": "planned_workout_segment_view"
+    }
+  ],
+  "annotations": [
+    {
+      "annotation_id": "late_fade_block_4",
+      "type": "warning",
+      "x": "9",
+      "label": "後段略慢",
+      "detail": "最後三組配速略高於目標",
+      "rule_id": "workout_late_fade_v0.1",
+      "severity": "medium"
+    }
+  ],
+  "verdict": {
+    "status": "available",
+    "code": "WORKOUT_ON_TARGET",
+    "headline": "這堂課大致按原定完成",
+    "message": "大多數區段都落在目標範圍內，後段出現輕微疲勞但未影響整體完成。",
+    "confidence": "high",
+    "rule_id": "workout_completion_v0.1",
+    "evidence": [
+      { "metric": "target_compliance_pct", "value": 92.4, "unit": "%" },
+      { "metric": "missed_targets", "value": 1, "unit": "segment" }
+    ],
+    "limitations": []
+  },
+  "data_quality": {
+    "overall_status": "available",
+    "completeness_score": 0.97,
+    "confidence": "high",
+    "missing_fields": [],
+    "estimated_fields": [],
+    "invalid_fields": [],
+    "coverage": {
+      "planned_segments_pct": 100,
+      "execution_segments_pct": 100
+    },
+    "limitations": []
+  },
+  "drill_down": {
+    "enabled": true,
+    "target_type": "activity",
+    "target_id": "activity_8891",
+    "fields": [
+      "segment_id",
+      "target_metric",
+      "target_min",
+      "target_max",
+      "actual_pace_sec_per_km",
+      "actual_duration_s",
+      "average_heart_rate_bpm",
+      "average_power_w"
+    ],
+    "notes": [
+      "可查看每組與恢復段的細節"
+    ]
+  },
+  "empty_state": {
+    "title": "目前沒有足夠資料",
+    "message": "這堂課有正式課表與執行資料，因此不會顯示空狀態。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

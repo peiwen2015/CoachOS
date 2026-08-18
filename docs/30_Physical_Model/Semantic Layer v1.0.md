@@ -67,7 +67,7 @@ Excluded from v1.0:
   - shoe display name
   - primary training purpose
   - secondary training purposes
-  - weather / subjective / performance context
+  - weather / subjective / performance context, including official activity-level average power when supplied by FIT
 
 `platform_summary_view`
 
@@ -123,16 +123,29 @@ Excluded from v1.0:
 
 `weekly_summary_view`
 
-- Five rolling 7-day windows relative to the latest activity date
-- Supports dashboard trend and baseline comparison
+- Supports two week-boundary modes:
+  - rolling: seven days ending at the latest available activity date
+  - fixed: seven calendar days beginning on the configured first weekday
+- Exposes the selected week boundary and completeness metadata
+- Formal weekly baseline comparisons use closed fixed weeks only
 
 `current_week_summary_view`
 
-- Current rolling 7-day summary only
+- Current selected week summary
+- Exposes at least:
+  - `week_start`
+  - `week_end`
+  - `latest_activity_date`
+  - `is_partial_week`
+  - elapsed days and progress percentage
+- In fixed mode, this view supports the `本週進度` snapshot while the current
+  week is unfinished
 
 `current_week_intelligence_view`
 
-- Current week plus four-week baseline comparison
+- Formal completed-week read plus four closed-week baseline comparison
+- In fixed mode, an unfinished current week must not be treated as the formal
+  current week for verdict generation
 - Exposes:
   - distance delta
   - load delta
@@ -174,6 +187,16 @@ Excluded from v1.0:
 
 - Groups activities by shoe + workout type
 - Intended for same-workout shoe comparison surfaces
+
+### Shoe Detail Surface
+
+The Shoes detail surface combines:
+
+- `shoe` for identity, category, lifecycle state, retirement target, and notes
+- `shoe_comparison_view` for total distance, activity count, observed dates, pace, heart rate, and load summaries
+- `activity_review_view` filtered by the stable `shoe_code` for the newest-first tracked activity list
+
+The surface is navigated by `shoe_code`, not by a mutable display name. `category` is a descriptive shoe field; an empty value is rendered as `未分類` and must not be interpreted as missing activity metadata.
 
 `recent_activity_view`
 

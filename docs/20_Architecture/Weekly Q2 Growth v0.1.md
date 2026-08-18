@@ -22,6 +22,12 @@ It works across:
 - recovery weeks
 - disrupted weeks
 
+This learning question is evaluated only for a complete formal review period.
+In fixed-week mode, an unfinished current week is represented by `本週進度`:
+an accumulation snapshot with explicit completeness, not a learning verdict.
+Its partial data must not enter the closed-week baseline or drive the Q2
+cause/evidence/recommendation sequence.
+
 It does not need more week types yet.
 
 The next step is no longer to prove Q2 again.

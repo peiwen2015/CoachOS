@@ -61,6 +61,7 @@ PORT = 8766
 DB_PATH = DEFAULT_DB_PATH
 DROPDOWN_SOURCE_TABLE = "dropdown_source"
 FEEDBACK_DICTIONARY_TABLE = "feedback_dictionary_option"
+WEEKLY_REVIEW_SETTINGS_TABLE = "weekly_review_settings"
 
 ACTIVITY_METADATA_PROVENANCE_TABLE = "activity_metadata_provenance"
 LEGACY_SHOE_FILL_CUTOFF = "2026-07-10T00:00:00"
@@ -1360,6 +1361,7 @@ def connect():
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
+    ensure_weekly_review_settings(connection)
     ensure_activity_gps_columns(connection)
     ensure_semantic_layer(connection)
     ensure_dropdown_sources(connection)
@@ -1369,6 +1371,54 @@ def connect():
     ensure_activity_wsi_table(connection)
     connection.commit()
     return connection
+
+
+def ensure_weekly_review_settings(connection):
+    connection.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {WEEKLY_REVIEW_SETTINGS_TABLE} (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            boundary_mode TEXT NOT NULL DEFAULT 'rolling'
+                CHECK (boundary_mode IN ('rolling', 'fixed')),
+            first_weekday INTEGER NOT NULL DEFAULT 1
+                CHECK (first_weekday BETWEEN 0 AND 6),
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    connection.execute(
+        f"""
+        INSERT OR IGNORE INTO {WEEKLY_REVIEW_SETTINGS_TABLE}
+            (id, boundary_mode, first_weekday)
+        VALUES (1, 'rolling', 1)
+        """
+    )
+
+
+def weekly_review_settings(connection):
+    ensure_weekly_review_settings(connection)
+    row = connection.execute(
+        f"SELECT boundary_mode, first_weekday FROM {WEEKLY_REVIEW_SETTINGS_TABLE} WHERE id = 1"
+    ).fetchone()
+    return dict(row) if row else {"boundary_mode": "rolling", "first_weekday": 1}
+
+
+def save_weekly_review_settings(connection, boundary_mode, first_weekday):
+    mode = boundary_mode if boundary_mode in {"rolling", "fixed"} else "rolling"
+    try:
+        weekday = int(first_weekday)
+    except (TypeError, ValueError):
+        weekday = 1
+    weekday = weekday if 0 <= weekday <= 6 else 1
+    ensure_weekly_review_settings(connection)
+    connection.execute(
+        f"""
+        UPDATE {WEEKLY_REVIEW_SETTINGS_TABLE}
+        SET boundary_mode = ?, first_weekday = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = 1
+        """,
+        (mode, weekday),
+    )
 
 
 def first_form_value(form, key, default=""):
@@ -2931,6 +2981,12 @@ def available_weeks(connection):
             week_offset,
             start_date,
             end_date,
+            latest_date,
+            boundary_mode,
+            first_weekday,
+            is_partial_week,
+            elapsed_days,
+            progress_pct,
             activities,
             total_km,
             training_load
@@ -2964,6 +3020,12 @@ def weekly_history(connection):
             week_offset,
             start_date,
             end_date,
+            latest_date,
+            boundary_mode,
+            first_weekday,
+            is_partial_week,
+            elapsed_days,
+            progress_pct,
             activities,
             total_km,
             total_time_sec,
@@ -2980,10 +3042,10 @@ def weekly_history_with_labels(connection, rows):
     labeled = []
     for row in rows or []:
         intelligence = selected_week_intelligence(connection, row["week_offset"])
-        review = weekly_review_payload(row, intelligence) if intelligence else None
+        review = weekly_review_payload(row, intelligence) if intelligence and not row["is_partial_week"] else None
         labeled.append({
             "row": row,
-            "coach_label": review["verdict"] if review else "—",
+            "coach_label": "本週進度" if row["is_partial_week"] else (review["verdict"] if review else "—"),
         })
     return labeled
 
@@ -4557,6 +4619,46 @@ def shoe_workout_comparison(connection, limit=12):
     ).fetchall()
 
 
+def shoe_activity_rows(connection, shoe_code, limit=5000):
+    """Return the tracked activities for one shoe, newest first."""
+    return connection.execute(
+        """
+        SELECT
+            activity_id,
+            activity_start_time,
+            activity_name,
+            activity_type,
+            distance_km,
+            duration_sec,
+            avg_pace_sec_per_km,
+            avg_hr,
+            training_load,
+            workout_type_name_en,
+            workout_type_name_zh,
+            primary_training_purpose_name_zh,
+            shoe_display_name
+        FROM activity_review_view
+        WHERE shoe_code = ?
+        ORDER BY activity_start_time DESC, activity_id DESC
+        LIMIT ?
+        """,
+        (shoe_code, limit),
+    ).fetchall()
+
+
+def shoe_record(connection, shoe_code):
+    return connection.execute(
+        """
+        SELECT
+            id, shoe_code, brand, model, nickname, category, is_active,
+            retire_date, retire_target_distance_km, notes
+        FROM shoe
+        WHERE shoe_code = ?
+        """,
+        (shoe_code,),
+    ).fetchone()
+
+
 def coach_today(intelligence, latest_activity):
     if not intelligence or not latest_activity:
         return None
@@ -5720,7 +5822,54 @@ def workout_structure_pattern_insights(summary_rows, period_label="本週"):
     return lines[:3]
 
 
-def chart_points(values, width, height, padding, lower_is_better=False):
+def split_distances_m(split_rows):
+    distances = []
+    for row in split_rows or []:
+        try:
+            distance_m = float(row["split_distance_m"] or 0)
+        except (TypeError, ValueError):
+            distance_m = 0.0
+        distances.append(max(distance_m, 0.0))
+    return distances
+
+
+def split_x_positions(split_rows, width, padding):
+    distances = split_distances_m(split_rows)
+
+    total_distance = sum(distances)
+    if total_distance <= 0:
+        count = len(split_rows or [])
+        step = (width - padding * 2) / (count - 1) if count > 1 else 0
+        return [padding + index * step for index in range(count)]
+
+    plot_width = width - padding * 2
+    cumulative_distance = 0.0
+    positions = []
+    for distance_m in distances:
+        cumulative_distance += distance_m
+        positions.append(padding + (cumulative_distance / total_distance) * plot_width)
+    return positions
+
+
+def distance_axis_ticks(split_rows, width, padding):
+    distances = split_distances_m(split_rows)
+    total_distance = sum(distances)
+    if total_distance <= 0:
+        return []
+    plot_width = width - padding * 2
+    tick_distances = list(range(0, int(total_distance // 1000) + 1))
+    if not tick_distances or total_distance - tick_distances[-1] * 1000 >= 250:
+        tick_distances.append(total_distance / 1000)
+    return [
+        (
+            padding + ((distance_km * 1000) / total_distance) * plot_width,
+            f"{distance_km:g} km",
+        )
+        for distance_km in tick_distances
+    ]
+
+
+def chart_points(values, width, height, padding, lower_is_better=False, x_positions=None):
     numeric = [float(value) if isinstance(value, (int, float)) else None for value in values]
     actual = [value for value in numeric if value is not None]
     if len(actual) < 2:
@@ -5728,12 +5877,12 @@ def chart_points(values, width, height, padding, lower_is_better=False):
     low = min(actual)
     high = max(actual)
     spread = high - low or 1
-    step = (width - padding * 2) / (len(numeric) - 1)
+    step = (width - padding * 2) / (len(numeric) - 1) if len(numeric) > 1 else 0
     points = []
     for index, value in enumerate(numeric):
         if value is None:
             continue
-        x = padding + index * step
+        x = x_positions[index] if x_positions and index < len(x_positions) else padding + index * step
         normalized = (value - low) / spread
         if lower_is_better:
             y = padding + normalized * (height - padding * 2)
@@ -5745,6 +5894,38 @@ def chart_points(values, width, height, padding, lower_is_better=False):
 
 def polyline_points(points):
     return " ".join(f"{x:.1f},{y:.1f}" for _index, _value, x, y in points)
+
+
+def trend_grid_and_axes(split_rows, width, height, padding, x_positions=None):
+    plot_height = height - padding * 2
+    grid_parts = []
+    label_parts = []
+    for level in range(5):
+        ratio = level / 4
+        y = padding + ratio * plot_height
+        grid_parts.append(
+            f'<line x1="{padding}" y1="{y:.1f}" x2="{width - padding}" y2="{y:.1f}" class="grid-line" />'
+        )
+        label_parts.append(
+            f'<text x="{padding - 9}" y="{y + 4:.1f}" text-anchor="end" class="tick-label">{100 - level * 25}%</text>'
+        )
+
+    for x, label in distance_axis_ticks(split_rows, width, padding):
+        grid_parts.append(
+            f'<line x1="{x:.1f}" y1="{padding}" x2="{x:.1f}" y2="{height - padding}" class="vertical-grid-line" />'
+        )
+        label_parts.append(
+            f'<line x1="{x:.1f}" y1="{height - padding}" x2="{x:.1f}" y2="{height - padding + 5}" class="tick-mark" />'
+        )
+        label_parts.append(
+            f'<text x="{x:.1f}" y="{height - padding + 20}" text-anchor="middle" class="tick-label">{html.escape(label)}</text>'
+        )
+
+    label_parts.extend([
+        f'<text x="{width / 2:.1f}" y="{height - 8}" text-anchor="middle" class="axis-title">累積距離（公里）</text>',
+        f'<text x="15" y="{height / 2:.1f}" text-anchor="middle" class="axis-title" transform="rotate(-90 15 {height / 2:.1f})">相對位置（各指標獨立縮放）</text>',
+    ])
+    return "".join(grid_parts), "".join(label_parts)
 
 
 def point_markers(points, css_class, split_rows):
@@ -5782,20 +5963,23 @@ def trend_svg(split_rows):
     if not split_rows:
         return '<p class="note">目前沒有分段可畫趨勢。</p>'
     width = 860
-    height = 260
-    padding = 28
+    height = 320
+    padding = 56
+    x_positions = split_x_positions(split_rows, width, padding)
     pace_values = [row["elapsed_pace_sec_per_km"] for row in split_rows]
     hr_values = [row["avg_hr"] for row in split_rows]
     power_values = [row["avg_power_w"] for row in split_rows]
-    pace = chart_points(pace_values, width, height, padding, lower_is_better=True)
-    hr = chart_points(hr_values, width, height, padding)
-    power = chart_points(power_values, width, height, padding)
+    pace = chart_points(pace_values, width, height, padding, lower_is_better=True, x_positions=x_positions)
+    hr = chart_points(hr_values, width, height, padding, x_positions=x_positions)
+    power = chart_points(power_values, width, height, padding, x_positions=x_positions)
+    grid_svg, axis_labels_svg = trend_grid_and_axes(split_rows, width, height, padding, x_positions=x_positions)
     pace_range = range_label("配速", pace_values, format_pace_seconds)
     hr_range = range_label("HR", hr_values, lambda value: f"{int(round(value))} bpm")
     power_range = range_label("功率", power_values, lambda value: f"{int(round(value))} W")
     return f"""
       <div class="chart-panel">
         <svg viewBox="0 0 {width} {height}" role="img" aria-label="配速 心率 功率 趨勢">
+          {grid_svg}
           <line x1="{padding}" y1="{height - padding}" x2="{width - padding}" y2="{height - padding}" class="axis" />
           <line x1="{padding}" y1="{padding}" x2="{padding}" y2="{height - padding}" class="axis" />
           <polyline points="{polyline_points(pace)}" class="trend pace-line" />
@@ -5804,7 +5988,9 @@ def trend_svg(split_rows):
           {point_markers(pace, "pace-marker", split_rows)}
           {point_markers(hr, "hr-marker", split_rows)}
           {point_markers(power, "power-marker", split_rows)}
+          {axis_labels_svg}
         </svg>
+        <p class="chart-axis-note">X 軸依各分段的實際距離比例配置；三條線各自依該指標的有效數值範圍縮放。</p>
         <div class="axis-ranges">{pace_range}{hr_range}{power_range}</div>
         <div class="legend">
           <span><i class="pace-dot"></i>配速</span>
@@ -6059,7 +6245,8 @@ def weekly_selector_bar(weeks, selected_week, page_slug="weekly"):
     options = []
     for row in weeks:
         week_key = str(row["week_offset"])
-        label = f"{week_label_from_offset(row['week_offset'])}（{row['start_date']} – {row['end_date']}）"
+        progress_suffix = "・本週進度" if row["is_partial_week"] else ""
+        label = f"{week_label_from_offset(row['week_offset'])}{progress_suffix}（{row['start_date']} – {row['end_date']}）"
         selected = " selected" if week_key == selected_week else ""
         options.append(
             f'<option value="{html.escape(week_key, quote=True)}"{selected}>{html.escape(label)}</option>'
@@ -6073,7 +6260,7 @@ def weekly_selector_bar(weeks, selected_week, page_slug="weekly"):
         <div class="month-selector-bar">
           <div>
             <span class="eyebrow">目前學習視窗（最近 5 週）</span>
-            <strong>{html.escape(week_label_from_offset(active_row["week_offset"]))}</strong>
+            <strong>{html.escape(week_label_from_offset(active_row["week_offset"]) + ("・本週進度" if active_row["is_partial_week"] else ""))}</strong>
             <p class="note">{html.escape(str(active_row["start_date"]))} – {html.escape(str(active_row["end_date"]))}</p>
           </div>
           <form method="get" class="month-selector-form">
@@ -6087,6 +6274,35 @@ def weekly_selector_bar(weeks, selected_week, page_slug="weekly"):
           </form>
         </div>
         <p class="note">週回顧只保留最近 5 週，讓這一頁專注在短期學習。更早以前的資料先留在背景裡，不打斷這一週真正留下來的東西。</p>
+      </section>
+    """
+
+
+def weekly_progress_panel(progress_week):
+    if not progress_week or not progress_week["is_partial_week"]:
+        return ""
+    return f"""
+      <section class="panel-section" id="weekly-progress">
+        <div class="weekly-review-grid">
+          <div class="weekly-review-main">
+            <div class="review-header">
+              <div>
+                <span class="eyebrow">本週進度</span>
+                <strong>{html.escape(str(progress_week['start_date']))} – {html.escape(str(progress_week['end_date']))}</strong>
+              </div>
+              <span class="status-badge baseline">進行中</span>
+            </div>
+            <div class="coach-summary review-summary">
+              <span>先看目前累積</span>
+              <strong>本週仍在進行中，先看進度，不急著替整週下結論。</strong>
+              <p>最新資料到 {html.escape(str(progress_week['latest_date']))}，已經過 {html.escape(str(progress_week['elapsed_days']))} / 7 天（{html.escape(format_number(progress_week['progress_pct'], 0))}%）。正式週回顧會在週期完整後建立。</p>
+            </div>
+          </div>
+          <div class="weekly-review-side">
+            <div class="review-card"><span>目前里程</span><strong>{html.escape(format_number(progress_week['total_km'], 1))} km</strong><p>活動 {html.escape(str(progress_week['activities'] or 0))} 次</p></div>
+            <div class="review-card"><span>目前負荷</span><strong>{html.escape(format_number(progress_week['training_load'], 0))}</strong><p>週期完成度 {html.escape(format_number(progress_week['progress_pct'], 0))}%</p></div>
+          </div>
+        </div>
       </section>
     """
 
@@ -10349,6 +10565,91 @@ def shoe_kpi_card(label, value, subtext=""):
     """
 
 
+def shoe_detail_panel(shoe, activities, rows):
+    if not shoe:
+        return f"""
+          <section class="panel-section">
+            <h2>找不到鞋款</h2>
+            <p class="note">這雙鞋可能已經被移除，或連結中的鞋款代碼不正確。</p>
+            <p><a class="primary-action" href="/?page=shoes">回到鞋款總覽</a></p>
+          </section>
+        """
+
+    name = shoe_display_name(shoe) or shoe["shoe_code"]
+    tracked_km = sum(float(row["distance_km"] or 0) for row in activities)
+    tracked_time = sum(int(row["duration_sec"] or 0) for row in activities)
+    avg_pace_values = [row["avg_pace_sec_per_km"] for row in activities if row["avg_pace_sec_per_km"] is not None]
+    avg_hr_values = [row["avg_hr"] for row in activities if row["avg_hr"] is not None]
+    total_distance = next((row["total_distance_km"] for row in rows if row["shoe_code"] == shoe["shoe_code"]), None)
+    total_count = next((row["run_count"] for row in rows if row["shoe_code"] == shoe["shoe_code"]), len(activities))
+    total_distance = total_distance if total_distance is not None else tracked_km
+    total_count = total_count if total_count is not None else len(activities)
+    active_label = "服役中" if shoe["is_active"] else "已退役"
+    category = str(shoe["category"] or "未分類")
+    target = shoe["retire_target_distance_km"]
+    progress = ""
+    if target:
+        progress = f'<p class="note">退役目標 {format_number(target, 0)} km · 已累積 {format_number(total_distance, 1)} km</p>'
+
+    activity_html = []
+    for row in activities:
+        title = row["activity_name"] or row["activity_type"] or "跑步活動"
+        workout = row["workout_type_name_zh"] or row["workout_type_name_en"] or "未標註課表"
+        activity_html.append(
+            f"""
+            <a class="shoe-activity-row" href="/?page=activity&activity={int(row['activity_id'])}">
+              <span class="shoe-activity-icon" aria-hidden="true">↗</span>
+              <span class="shoe-activity-main">
+                <strong>{html.escape(str(title))}</strong>
+                <small>{html.escape(str(workout))} · {html.escape(format_short_datetime(row['activity_start_time']))}</small>
+              </span>
+              <span class="shoe-activity-stats">
+                <b>{html.escape(format_duration_hms(row['duration_sec']))}</b>
+                <small>{html.escape(format_number(row['distance_km'], 2))} km · {html.escape(format_pace_seconds(row['avg_pace_sec_per_km']) or '—')}</small>
+              </span>
+              <span class="shoe-activity-arrow" aria-hidden="true">›</span>
+            </a>
+            """
+        )
+
+    summary_cards = [
+        shoe_kpi_card("累積距離", f"{format_number(total_distance, 1)} km", f"{total_count} 次活動"),
+        shoe_kpi_card("使用時間", format_hours(tracked_time), "目前顯示的活動"),
+        shoe_kpi_card("平均配速", format_pace_seconds(sum(avg_pace_values) / len(avg_pace_values)) if avg_pace_values else "—", "已追蹤活動"),
+        shoe_kpi_card("平均心率", f"{int(round(sum(avg_hr_values) / len(avg_hr_values)))} bpm" if avg_hr_values else "—", "已追蹤活動"),
+    ]
+
+    return f"""
+      <section class="panel-section shoe-detail-hero">
+        <p><a class="back-link" href="/?page=shoes">← 回到鞋款總覽</a></p>
+        <div class="shoe-detail-heading">
+          <div class="shoe-detail-mark" aria-hidden="true">⌁</div>
+          <div>
+            <span class="eyebrow">鞋款 · 已追蹤裝備</span>
+            <h1>{html.escape(name)}</h1>
+            <p class="shoe-detail-meta">{html.escape(category)} · <span class="status-badge {'balanced' if shoe['is_active'] else 'watch'}">{html.escape(active_label)}</span></p>
+          </div>
+        </div>
+        <div class="shoe-detail-progress">
+          <div class="progress-meta"><span>鞋款使用摘要</span><strong>{html.escape(format_number(total_distance, 1))} km</strong></div>
+          <div class="progress-track"><div class="progress-fill" style="width:{min(100, max(4, int(float(total_distance or 0) / float(target) * 100))) if target else 100}%"></div></div>
+          {progress}
+        </div>
+        <div class="metric-grid shoe-kpi-grid">{"".join(summary_cards)}</div>
+        {f'<p class="note">備註：{html.escape(str(shoe["notes"]))}</p>' if shoe["notes"] else ''}
+      </section>
+      <section class="panel-section" id="shoe-activities">
+        <div class="section-title-row">
+          <div><h2>已追蹤的活動</h2><p class="note">{len(activities)} 個活動使用這雙鞋；點擊任一活動可查看完整訓練判讀。</p></div>
+          <span class="status-badge balanced">{len(activities)} activities</span>
+        </div>
+        <div class="shoe-activity-list">
+          {''.join(activity_html) if activity_html else '<p class="note">目前還沒有活動使用這雙鞋。</p>'}
+        </div>
+      </section>
+    """
+
+
 def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_counts=None, message=""):
     used_rows = [row for row in rows if (row["run_count"] or 0) > 0]
     active_rows = [row for row in rows if row["is_active"]]
@@ -10494,10 +10795,11 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_c
         avg_hr = "" if row["avg_hr"] is None else str(int(round(row["avg_hr"])))
         avg_load = "" if row["avg_training_load"] is None else format_number(row["avg_training_load"], 1)
         cadence = "" if row["avg_cadence_spm"] is None else format_number(row["avg_cadence_spm"], 1)
+        detail_href = "/?" + urlencode({"page": "shoes", "shoe": row["shoe_code"]})
         table_rows.append(
             f"""
             <tr>
-              <td>{html.escape(name)}</td>
+              <td><a class="inline-jump-link" href="{html.escape(detail_href, quote=True)}">{html.escape(name)}</a></td>
               <td>{html.escape(str(row["category"] or ""))}</td>
               <td>{html.escape(status)}</td>
               <td>{row["run_count"]}</td>
@@ -11682,12 +11984,36 @@ def metadata_page_panel(
     """
 
 
-def settings_page_panel(dropdown_options, workout_rows, purpose_rows, workout_purpose_rows, feedback_difficulty_rows, feedback_feel_rows, message=""):
+def settings_page_panel(dropdown_options, workout_rows, purpose_rows, workout_purpose_rows, feedback_difficulty_rows, feedback_feel_rows, weekly_settings=None, message=""):
+    weekly_settings = weekly_settings or {"boundary_mode": "rolling", "first_weekday": 1}
+    boundary_mode = weekly_settings.get("boundary_mode", "rolling")
+    first_weekday = int(weekly_settings.get("first_weekday", 1))
+    weekday_options = [(1, "星期一"), (2, "星期二"), (3, "星期三"), (4, "星期四"), (5, "星期五"), (6, "星期六"), (0, "星期日")]
     message_html = f'<section class="status">{html.escape(message)}</section>' if message else ""
     return f"""
       {message_html}
+      <h2 class="settings-page-title">設定中心</h2>
+      <section class="panel-section weekly-review-settings-card">
+        <h2>週回顧範圍</h2>
+        <p class="note">滾動模式維持目前方式；固定週模式會依選定星期開始。固定週尚未結束時，只顯示「本週進度」，不列入正式週判讀。</p>
+        <form method="post" action="/settings/weekly-review" class="weekly-review-settings-form">
+          <label>
+            <span>週期方式</span>
+            <select name="boundary_mode">
+              <option value="rolling"{" selected" if boundary_mode == "rolling" else ""}>最近七天（目前方式）</option>
+              <option value="fixed"{" selected" if boundary_mode == "fixed" else ""}>固定週</option>
+            </select>
+          </label>
+          <label>
+            <span>固定週第一天</span>
+            <select name="first_weekday">
+              {"".join(f'<option value="{value}"{" selected" if value == first_weekday else ""}>{label}</option>' for value, label in weekday_options)}
+            </select>
+          </label>
+          <div class="form-actions"><button type="submit">儲存週回顧設定</button></div>
+        </form>
+      </section>
       <section class="panel-section">
-        <h2>設定中心</h2>
         <div class="weekly-review-grid">
           <div class="weekly-review-main">
             <div class="review-header">
@@ -12069,6 +12395,60 @@ def base_styles():
       font-size: 18px;
       letter-spacing: 0;
     }
+    .settings-page-title {
+      margin: 0 0 14px;
+      font-size: 24px;
+    }
+    .weekly-review-settings-card {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: #fff;
+      box-shadow: 0 8px 22px rgba(31, 41, 51, 0.05);
+    }
+    .weekly-review-settings-card h2,
+    .weekly-review-settings-card .note {
+      margin: 0;
+    }
+    .weekly-review-settings-form {
+      display: grid;
+      grid-template-columns: minmax(220px, 1.2fr) minmax(180px, 1fr) auto;
+      gap: 12px;
+      align-items: end;
+      margin: 0;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f7fafb;
+    }
+    .weekly-review-settings-form label {
+      display: grid;
+      gap: 6px;
+    }
+    .weekly-review-settings-form label span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    .weekly-review-settings-form select {
+      width: 100%;
+      min-height: 38px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+    .weekly-review-settings-form .form-actions {
+      align-self: end;
+    }
+    .weekly-review-settings-form .form-actions button {
+      min-width: 132px;
+    }
     .note {
       color: var(--muted);
       font-size: 13px;
@@ -12193,6 +12573,30 @@ def base_styles():
       stroke: #cdd7df;
       stroke-width: 1;
     }
+    .grid-line,
+    .vertical-grid-line {
+      stroke: #cbd5df;
+      stroke-width: 1;
+      stroke-dasharray: 4 5;
+      opacity: 0.72;
+    }
+    .vertical-grid-line {
+      opacity: 0.42;
+    }
+    .tick-mark {
+      stroke: #93a4b3;
+      stroke-width: 1;
+    }
+    .tick-label,
+    .axis-title {
+      fill: #657789;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .axis-title {
+      font-size: 12px;
+      font-weight: 800;
+    }
     .trend {
       fill: none;
       stroke-width: 3;
@@ -12217,6 +12621,12 @@ def base_styles():
       color: var(--muted);
       font-size: 12px;
       font-weight: 700;
+    }
+    .chart-axis-note {
+      margin: 7px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
     }
     .axis-ranges span {
       padding: 5px 8px;
@@ -13205,6 +13615,114 @@ def base_styles():
     .shoe-kpi-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       margin-bottom: 0;
+    }
+    .shoe-detail-hero {
+      padding-top: 28px;
+    }
+    .back-link {
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 13px;
+    }
+    .shoe-detail-heading {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin: 28px 0 30px;
+    }
+    .shoe-detail-heading h1 {
+      margin: 0;
+      font-size: clamp(34px, 6vw, 60px);
+      letter-spacing: -0.055em;
+      line-height: 1.05;
+    }
+    .shoe-detail-mark {
+      display: grid;
+      place-items: center;
+      width: 72px;
+      height: 72px;
+      flex: 0 0 72px;
+      border-radius: 22px;
+      background: var(--navy);
+      color: var(--mint);
+      font-size: 36px;
+      font-weight: 900;
+    }
+    .shoe-detail-meta {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .shoe-detail-progress {
+      max-width: 680px;
+      margin-bottom: 28px;
+    }
+    .shoe-detail-progress .progress-track {
+      margin-top: 8px;
+    }
+    .section-title-row {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .section-title-row h2 {
+      margin-bottom: 8px;
+    }
+    .shoe-activity-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 24px;
+    }
+    .shoe-activity-row {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) auto 22px;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .shoe-activity-row:hover {
+      transform: translateY(-2px);
+      border-color: #9bbab5;
+      box-shadow: 0 10px 24px rgba(31, 41, 51, .08);
+    }
+    .shoe-activity-icon {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: #e9f7f1;
+      color: #0f766e;
+      font-weight: 900;
+    }
+    .shoe-activity-main,
+    .shoe-activity-stats {
+      display: grid;
+      gap: 3px;
+    }
+    .shoe-activity-main strong {
+      font-size: 15px;
+    }
+    .shoe-activity-row small {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .shoe-activity-stats {
+      text-align: right;
+    }
+    .shoe-activity-stats b {
+      font-size: 14px;
+    }
+    .shoe-activity-arrow {
+      color: var(--muted);
+      font-size: 28px;
+      line-height: 1;
     }
     .training-kpi-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -14300,6 +14818,10 @@ def base_styles():
       .compact-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .weekly-review-grid { grid-template-columns: 1fr; }
       .shoe-kpi-grid { grid-template-columns: 1fr; }
+      .shoe-detail-heading { align-items: flex-start; }
+      .shoe-detail-mark { width: 56px; height: 56px; flex-basis: 56px; border-radius: 18px; font-size: 28px; }
+      .shoe-activity-row { grid-template-columns: 34px minmax(0, 1fr) 18px; gap: 10px; padding: 13px 12px; }
+      .shoe-activity-stats { display: none; }
       .training-kpi-grid { grid-template-columns: 1fr; }
       .briefing-evidence-grid { grid-template-columns: 1fr; }
       .raw-data-columns { grid-template-columns: 1fr; }
@@ -14314,6 +14836,8 @@ def base_styles():
       .journey-session-grid { grid-template-columns: 1fr; }
       .metadata-form { grid-template-columns: 1fr; }
       .metadata-batch-bar { grid-template-columns: 1fr; }
+      .weekly-review-settings-form { grid-template-columns: 1fr; }
+      .weekly-review-settings-form .form-actions button { width: 100%; }
       .scope-link-grid { grid-template-columns: 1fr; }
       .month-selector-bar { flex-direction: column; align-items: stretch; }
       .month-selector-form { width: 100%; }
@@ -14369,7 +14893,7 @@ def page_hero(page):
     """
 
 
-def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="unassigned", message="", month="", week="", batch="1", coach_step=None, scroll_y=""):
+def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="unassigned", message="", month="", week="", batch="1", coach_step=None, scroll_y="", shoe_code=""):
     handoff_script = """
   <script>
     function extractAiReplyMarkdown(raw) {
@@ -14624,6 +15148,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
     weekly_key_session_rows = []
     weekly_workout_structure_summary_rows = []
     weekly_wsi_summary = None
+    weekly_progress_week = None
     month_rows = []
     monthly = None
     selected_month = ""
@@ -14651,6 +15176,8 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
     shoe_status_data = []
     shoe_intelligence_rows = []
     shoe_workout_rows = []
+    shoe_detail = None
+    shoe_detail_activities = []
     settings_dropdown_options = load_metadata_dropdown_options()
     metadata_shoes = []
     metadata_workouts = []
@@ -14658,6 +15185,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
     metadata_workout_purpose_rows = []
     feedback_difficulty_rows = []
     feedback_feel_rows = []
+    weekly_settings = {"boundary_mode": "rolling", "first_weekday": 1}
     metadata_rows = []
     metadata_selected = None
     metadata_scope_data = None
@@ -14680,19 +15208,24 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
         summary = metrics(connection)
 
         if page == "weekly":
+            weekly_settings = weekly_review_settings(connection)
             all_week_rows = available_weeks(connection)
             week_rows = all_week_rows[:5]
             allowed_week_offsets = {str(row["week_offset"]) for row in week_rows}
             selected_week_request = str(week) if week not in ("", None) else None
             if selected_week_request and selected_week_request not in allowed_week_offsets:
                 selected_week_request = None
+            weekly_progress_week = week_rows[0] if week_rows and week_rows[0]["is_partial_week"] else None
+            if weekly_progress_week and selected_week_request in (None, "0"):
+                selected_week_request = "1" if len(week_rows) > 1 else None
             weekly = selected_week_summary(connection, selected_week_request or None)
-            selected_week = str(weekly["week_offset"]) if weekly else (str(week_rows[0]["week_offset"]) if week_rows else "0")
-            intelligence = selected_week_intelligence(connection, selected_week or None)
+            selected_week = str(week if week not in ("", None) else (weekly["week_offset"] if weekly else (week_rows[0]["week_offset"] if week_rows else "0")))
+            formal_week_offset = weekly["week_offset"] if weekly else None
+            intelligence = selected_week_intelligence(connection, formal_week_offset)
             weekly_rows = weekly_history(connection)[:5]
             weekly_rows_with_labels = weekly_history_with_labels(connection, weekly_rows)
-            distribution_rows = selected_week_distribution(connection, selected_week or None, limit=6)
-            weekly_key_session_rows = selected_week_key_sessions(connection, selected_week or None)
+            distribution_rows = selected_week_distribution(connection, formal_week_offset, limit=6)
+            weekly_key_session_rows = selected_week_key_sessions(connection, formal_week_offset)
             weekly_workout_structure_summary_rows = key_session_workout_structure_summary(connection, weekly_key_session_rows)
             if weekly:
                 weekly_wsi_summary = wsi_period_summary(
@@ -14756,6 +15289,9 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
             shoe_intelligence_rows = shoe_intelligence(connection)
             shoe_workout_rows = shoe_workout_comparison(connection, limit=12)
             shoes_scope_data = metadata_scope_counts(connection)
+            if shoe_code:
+                shoe_detail = shoe_record(connection, shoe_code)
+                shoe_detail_activities = shoe_activity_rows(connection, shoe_code)
 
         elif page == "training":
             distribution_rows = training_distribution(connection, limit=6)
@@ -14791,6 +15327,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
             ) if metadata_selected else {}
 
         elif page == "settings":
+            weekly_settings = weekly_review_settings(connection)
             settings_dropdown_options, metadata_shoes, metadata_workouts, metadata_purposes, metadata_workout_purpose_rows = metadata_choice_sets(connection)
             feedback_difficulty_rows = feedback_dictionary_rows(connection, "garmin_rpe")
             feedback_feel_rows = feedback_dictionary_rows(connection, "garmin_feel")
@@ -14850,6 +15387,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
     if page == "weekly":
         return f"""{html_start}
     {weekly_selector_bar(week_rows, selected_week, "weekly")}
+    {weekly_progress_panel(weekly_progress_week)}
     {weekly_review_panel(weekly, intelligence, weekly_rows, distribution_rows, weekly_key_session_rows, weekly_workout_structure_summary_rows, selected_week, weekly_rows_with_labels, weekly_knowledge_summary, monthly_overview, overview_attention, weekly_wsi_summary, weekly_ai_reply)}
     {archive_metric_strip(summary)}
   </main>
@@ -14881,7 +15419,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
 
     if page == "shoes":
         return f"""{html_start}
-    {shoes_page_panel(shoe_rows, shoe_intelligence_rows, shoe_workout_rows, shoe_status_data, shoes_scope_data, message)}
+    {shoe_detail_panel(shoe_detail, shoe_detail_activities, shoe_rows) if shoe_code else shoes_page_panel(shoe_rows, shoe_intelligence_rows, shoe_workout_rows, shoe_status_data, shoes_scope_data, message)}
     {archive_metric_strip(summary)}
   </main>
 </body>
@@ -14920,7 +15458,7 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
 
     if page == "settings":
         return f"""{html_start}
-    {settings_page_panel(settings_dropdown_options, metadata_workouts, metadata_purposes, metadata_workout_purpose_rows, feedback_difficulty_rows, feedback_feel_rows, message)}
+    {settings_page_panel(settings_dropdown_options, metadata_workouts, metadata_purposes, metadata_workout_purpose_rows, feedback_difficulty_rows, feedback_feel_rows, weekly_settings, message)}
     {archive_metric_strip(summary)}
   </main>
 </body>
@@ -15036,6 +15574,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 (query.get("batch") or ["1"])[0],
                 (query.get("coach_step") or [None])[0],
                 (query.get("scroll_y") or [""])[0],
+                (query.get("shoe") or [""])[0],
             )
         )
 
@@ -15511,6 +16050,16 @@ class DashboardHandler(BaseHTTPRequestHandler):
             if scroll_y:
                 params["scroll_y"] = scroll_y
             self.redirect("/?" + urlencode(params))
+            return
+
+        if parsed.path == "/settings/weekly-review":
+            form = parse_qs(body.decode("utf-8"))
+            boundary_mode = first_form_value(form, "boundary_mode", "rolling").strip()
+            first_weekday = first_form_value(form, "first_weekday", "1").strip()
+            with connect() as connection:
+                save_weekly_review_settings(connection, boundary_mode, first_weekday)
+                connection.commit()
+            self.redirect("/?" + urlencode({"page": "settings", "message": "週回顧範圍已儲存"}))
             return
 
         self.send_html(render_dashboard(page="metadata", message="Unsupported action"), status=400)

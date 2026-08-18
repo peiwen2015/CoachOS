@@ -8,6 +8,8 @@ One running shoe = one record.
 
 It is referenced by `activity.shoe_id` and supports mileage tracking, retirement management, and future shoe-efficiency analysis through joins and views.
 
+The current CoachOS Shoes surface supports a drill-down interaction: selecting a shoe opens a shoe summary and the activities tracked with that shoe. The detail surface reads lifecycle fields from `shoe` and derived usage/performance fields from activity views; it does not add activity metrics to the `shoe` table.
+
 ## Design Philosophy
 
 `shoe` describes what the shoe is.
@@ -122,11 +124,22 @@ Trail
 
 This is not a coaching default. It describes the shoe, not what today's workout should be.
 
+When `category` is blank, the product displays `未分類`. This means the shoe's descriptive category has not been set; it does not mean that the activity's workout type, training purpose, or shoe assignment is missing.
+
 ### is_active
 
 `is_active` indicates whether the shoe is currently in rotation.
 
 It replaces an open-ended `status` field in v1.1 to keep lifecycle management simple and consistent.
+
+`is_active` is manually governed lifecycle metadata. FIT import and reference-data
+reconciliation may create a missing shoe or update descriptive fields, but must
+not overwrite `is_active`, `retire_date`, or other manual lifecycle fields on an
+existing shoe.
+
+This boundary is required because a recurring FIT import can run after a shoe
+has been retired. Import idempotence must preserve the runner's lifecycle
+decision rather than reactivate the shoe from a default reference row.
 
 ### first_run_date and retire_actual_distance_km
 
@@ -150,6 +163,16 @@ Manual lifecycle fields are still useful when historical data is incomplete.
 | avg_hr | Performance metric derived from activities using the shoe | View / query |
 | avg_power | Performance metric derived from activities using the shoe | View / query |
 | avg_gct | Running dynamics metric derived from activity/split data | View / query |
+
+## Shoe Detail Surface Contract
+
+The shoe detail surface is keyed by stable `shoe_code` and should provide:
+
+- lifecycle summary: display name, category, active/retired state, and retirement target when present
+- usage summary: total distance, tracked activity count, total tracked time, average pace, and average heart rate
+- tracked activity list: newest first, with a link to the corresponding activity review
+
+The activity list is filtered by the activity's governed `shoe_id` / `shoe_code` relationship. A shoe detail page must not infer activities from the display name alone.
 | efficiency_score | Analysis output | Analysis layer |
 | stack_height | Useful product spec, but not required for v1 analytics | Future metadata item |
 | foam_type | Useful product spec, but not required for v1 analytics | Future metadata item |

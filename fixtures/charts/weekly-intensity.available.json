@@ -1,0 +1,106 @@
+{
+  "chart_id": "weekly_intensity_distribution",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "available",
+  "title": "週訓練強度分布",
+  "decision_question": "我的訓練是否仍以低強度為主？",
+  "period": {
+    "start_date": "2026-06-22",
+    "end_date": "2026-07-19",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {
+    "period_type": "rolling_4w",
+    "low_intensity_share_pct": 72.0,
+    "moderate_intensity_share_pct": 18.0,
+    "high_intensity_share_pct": 10.0,
+    "dominant_band": "low",
+    "zone_system": "workout_type_intensity_category"
+  },
+  "axes": {
+    "x": { "label": "強度", "unit": "category", "scale": "ordinal" },
+    "y_left": { "label": "佔比", "unit": "%", "scale": "linear" }
+  },
+  "series": [
+    {
+      "series_id": "intensity_distribution",
+      "label": "強度分布",
+      "type": "bar",
+      "unit": "%",
+      "axis": "left",
+      "display_precision": 0,
+      "hidden_by_default": false,
+      "source_method": "training_balance_view",
+      "data_quality_status": "available",
+      "points": [
+        { "x": "Recovery", "y": 14, "status": "available", "source": "weekly_intensity_distribution_view" },
+        { "x": "Easy", "y": 58, "status": "available", "source": "weekly_intensity_distribution_view" },
+        { "x": "Moderate", "y": 18, "status": "available", "source": "weekly_intensity_distribution_view" },
+        { "x": "Hard", "y": 10, "status": "available", "source": "weekly_intensity_distribution_view" }
+      ]
+    }
+  ],
+  "reference_bands": [
+    {
+      "band_id": "low_dominant_range",
+      "label": "低強度主導",
+      "axis": "left",
+      "start_x": "Recovery",
+      "end_x": "Easy",
+      "lower": 65,
+      "upper": 80,
+      "unit": "%",
+      "status": "available",
+      "method": "training_balance_policy_v0.1"
+    }
+  ],
+  "annotations": [],
+  "verdict": {
+    "status": "available",
+    "code": "LOW_DOMINANT",
+    "headline": "訓練仍以低強度為主",
+    "message": "最近 4 週的訓練結構仍由低強度活動主導。",
+    "confidence": "high",
+    "rule_id": "weekly_intensity_distribution_v0.1",
+    "evidence": [
+      { "metric": "low_intensity_share_pct", "value": 72.0, "unit": "%" }
+    ],
+    "limitations": []
+  },
+  "data_quality": {
+    "overall_status": "available",
+    "completeness_score": 0.96,
+    "confidence": "high",
+    "missing_fields": [],
+    "estimated_fields": [],
+    "invalid_fields": [],
+    "coverage": {
+      "zone_pct": 100,
+      "classification_pct": 100
+    },
+    "limitations": []
+  },
+  "drill_down": {
+    "enabled": true,
+    "target_type": "period",
+    "target_id": "rolling_4w",
+    "fields": [
+      "activity_id",
+      "workout_type",
+      "training_purpose",
+      "duration_sec",
+      "training_load"
+    ],
+    "notes": [
+      "可切換到最近 7 天或單堂課"
+    ]
+  },
+  "empty_state": {
+    "title": "目前沒有足夠資料",
+    "message": "這張圖需要可用的強度分類或區間資料。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

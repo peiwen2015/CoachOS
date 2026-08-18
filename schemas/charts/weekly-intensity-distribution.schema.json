@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "weekly-intensity-distribution.schema.json",
+  "title": "Weekly Intensity Distribution Chart",
+  "allOf": [
+    { "$ref": "./chart-envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "chart_id": { "const": "weekly_intensity_distribution" }
+      }
+    }
+  ]
+}

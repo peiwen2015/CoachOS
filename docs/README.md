@@ -97,32 +97,39 @@ flowchart TD
 7. `00_Governance/CoachOS Coach Knowledge Lineage v1.0.md`
 8. `00_Governance/CoachOS Product Roadmap v1.0 Draft.md`
 9. `00_Governance/Product UX Polish Sprint v1.0.md`
-10. `00_Governance/Running Analytics Metadata Repository v1.1.md`
-11. `00_Governance/Metadata Design Standard v1.0.md`
-12. `01_ADR/`
-13. `00_Governance/Canonical Data Model Release Notes.md`
-14. `10_Canonical_Data_Model/Activity LDM v1.1 Final.md`
-15. `10_Canonical_Data_Model/LDM Validation Round 1 - activity.md`
-16. `10_Canonical_Data_Model/Kilometer Split LDM v1.1 Final.md`
-17. `10_Canonical_Data_Model/LDM Validation Round 1 - kilometer_split.md`
-18. `10_Canonical_Data_Model/Shoe LDM v1.1 Final.md`
-19. `10_Canonical_Data_Model/LDM Validation Round 1 - shoe.md`
-20. `10_Canonical_Data_Model/Workout Type LDM v1.1 Final.md`
-21. `10_Canonical_Data_Model/LDM Validation Round 1 - workout_type.md`
-22. `10_Canonical_Data_Model/Training Purpose LDM v1.1 Final.md`
-23. `10_Canonical_Data_Model/LDM Validation Round 1 - training_purpose.md`
-24. `10_Canonical_Data_Model/Activity Training Purpose LDM v1.1 Final.md`
-25. `10_Canonical_Data_Model/LDM Validation Round 1 - activity_training_purpose.md`
-26. `20_Architecture/Narrative Engine Boundary Draft v0.1.md`
-27. `20_Architecture/Narrative Engine Evolution v0.1.md`
-28. `20_Architecture/Context Gap Log v0.1.md`
-29. `20_Architecture/Recovery Knowledge Model v0.1.md`
-30. `20_Architecture/Load Build Knowledge Domain v0.1.md`
-31. `20_Architecture/Activity Coach Knowledge Implementation Note v0.1.md`
-32. `20_Architecture/Monthly Reading Pattern v0.1.md`
-33. `30_Physical_Model/SQLite Mapping Specification v1.0.md`
-34. `30_Physical_Model/SQLite Schema v1.0.sql`
-35. `30_Physical_Model/Semantic Layer v1.0.md`
+10. `00_Governance/CoachOS Chart Priorities v0.1.md`
+11. `00_Governance/CoachOS Chart Requirements Specification v0.1.md`
+12. `00_Governance/CoachOS Chart Semantic View and Data Field Mapping v0.1.md`
+13. `30_Physical_Model/CoachOS Chart Semantic View SQL Draft v0.1.sql`
+14. `30_Physical_Model/CoachOS Chart Semantic View SQL Notes v0.1.md`
+15. `20_Architecture/CoachOS Chart Rendering Contract v0.1.md`
+16. `20_Architecture/CoachOS Chart API Payload Examples v0.1.md`
+17. `00_Governance/Running Analytics Metadata Repository v1.1.md`
+18. `00_Governance/Metadata Design Standard v1.0.md`
+19. `01_ADR/`
+20. `00_Governance/Canonical Data Model Release Notes.md`
+21. `10_Canonical_Data_Model/Activity LDM v1.1 Final.md`
+22. `10_Canonical_Data_Model/LDM Validation Round 1 - activity.md`
+23. `10_Canonical_Data_Model/Kilometer Split LDM v1.1 Final.md`
+24. `10_Canonical_Data_Model/LDM Validation Round 1 - kilometer_split.md`
+25. `10_Canonical_Data_Model/Shoe LDM v1.1 Final.md`
+26. `10_Canonical_Data_Model/LDM Validation Round 1 - shoe.md`
+27. `10_Canonical_Data_Model/Workout Type LDM v1.1 Final.md`
+28. `10_Canonical_Data_Model/LDM Validation Round 1 - workout_type.md`
+29. `10_Canonical_Data_Model/Training Purpose LDM v1.1 Final.md`
+30. `10_Canonical_Data_Model/LDM Validation Round 1 - training_purpose.md`
+31. `10_Canonical_Data_Model/Activity Training Purpose LDM v1.1 Final.md`
+32. `10_Canonical_Data_Model/LDM Validation Round 1 - activity_training_purpose.md`
+33. `20_Architecture/Narrative Engine Boundary Draft v0.1.md`
+34. `20_Architecture/Narrative Engine Evolution v0.1.md`
+35. `20_Architecture/Context Gap Log v0.1.md`
+36. `20_Architecture/Recovery Knowledge Model v0.1.md`
+37. `20_Architecture/Load Build Knowledge Domain v0.1.md`
+38. `20_Architecture/Activity Coach Knowledge Implementation Note v0.1.md`
+39. `20_Architecture/Monthly Reading Pattern v0.1.md`
+40. `30_Physical_Model/SQLite Mapping Specification v1.0.md`
+41. `30_Physical_Model/SQLite Schema v1.0.sql`
+42. `30_Physical_Model/Semantic Layer v1.0.md`
 
 ## Governance Principle
 

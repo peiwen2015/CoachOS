@@ -1,0 +1,143 @@
+{
+  "chart_id": "weekly_training_load",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "available",
+  "title": "週訓練負荷趨勢",
+  "decision_question": "最近的訓練負荷是否穩定且合理？",
+  "period": {
+    "start_date": "2026-05-04",
+    "end_date": "2026-07-19",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {
+    "current_week_load": 412,
+    "previous_week_load": 332,
+    "change_wow_pct": 24.1,
+    "current_week_distance_km": 48.2,
+    "current_week_duration_hr": 5.1,
+    "acute_load": 412,
+    "chronic_load": 356,
+    "acute_chronic_ratio": 1.16,
+    "trend_direction": "up",
+    "phase_label": "build"
+  },
+  "axes": {
+    "x": {
+      "label": "週次",
+      "unit": "week",
+      "scale": "time"
+    },
+    "y_left": {
+      "label": "負荷 / 里程",
+      "unit": "load|km",
+      "scale": "linear"
+    }
+  },
+  "series": [
+    {
+      "series_id": "weekly_training_load",
+      "label": "訓練負荷",
+      "type": "line",
+      "unit": "load",
+      "axis": "left",
+      "display_precision": 0,
+      "hidden_by_default": false,
+      "source_method": "coachos_derived",
+      "data_quality_status": "available",
+      "points": [
+        { "x": "2026-05-04", "y": 298, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-05-11", "y": 316, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-05-18", "y": 340, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-05-25", "y": 355, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-06-01", "y": 372, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-06-08", "y": 384, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-06-15", "y": 401, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-06-22", "y": 389, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-06-29", "y": 395, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-07-06", "y": 402, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-07-13", "y": 412, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-07-20", "y": 0, "status": "available", "source": "weekly_training_load_view" }
+      ]
+    }
+  ],
+  "reference_bands": [
+    {
+      "band_id": "recent_baseline",
+      "label": "近期基準",
+      "axis": "left",
+      "start_x": "2026-06-15",
+      "end_x": "2026-07-13",
+      "lower": 380,
+      "upper": 405,
+      "unit": "load",
+      "status": "estimated",
+      "method": "4w_trailing_average"
+    }
+  ],
+  "annotations": [
+    {
+      "annotation_id": "week_2026_07_13",
+      "type": "warning",
+      "x": "2026-07-13",
+      "label": "負荷增幅偏高",
+      "detail": "較前一週增加 24%",
+      "rule_id": "weekly_load_change_warning_v0.1",
+      "severity": "medium"
+    }
+  ],
+  "verdict": {
+    "status": "warning",
+    "code": "LOAD_INCREASE_HIGH",
+    "headline": "本週負荷增加偏快",
+    "message": "本週訓練負荷較上週增加 24%，高於目前建議範圍。",
+    "confidence": "medium",
+    "rule_id": "weekly_load_change_warning_v0.1",
+    "evidence": [
+      { "metric": "current_week_load", "value": 412, "unit": "load" },
+      { "metric": "change_wow_pct", "value": 24.1, "unit": "%" }
+    ],
+    "limitations": [
+      "急性／慢性負荷模型尚未納入"
+    ]
+  },
+  "data_quality": {
+    "overall_status": "available",
+    "completeness_score": 0.98,
+    "confidence": "high",
+    "missing_fields": [],
+    "estimated_fields": [
+      "acute_chronic_ratio"
+    ],
+    "invalid_fields": [],
+    "coverage": {
+      "training_load_pct": 100,
+      "distance_pct": 100,
+      "duration_pct": 100
+    },
+    "limitations": []
+  },
+  "drill_down": {
+    "enabled": true,
+    "target_type": "week",
+    "target_id": "2026-W29",
+    "fields": [
+      "activity_id",
+      "date",
+      "distance_km",
+      "duration_sec",
+      "training_load",
+      "activity_type"
+    ],
+    "notes": [
+      "點擊後可查看週內活動清單"
+    ]
+  },
+  "empty_state": {
+    "title": "目前沒有足夠資料",
+    "message": "這張圖需要至少數週完整訓練資料。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

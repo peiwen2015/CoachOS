@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "activity-decoupling.schema.json",
+  "title": "Activity Decoupling Chart",
+  "allOf": [
+    { "$ref": "./chart-envelope.schema.json" },
+    {
+      "type": "object",
+      "properties": {
+        "chart_id": { "const": "activity_decoupling" }
+      }
+    }
+  ]
+}

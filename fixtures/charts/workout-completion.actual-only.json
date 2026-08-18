@@ -1,0 +1,110 @@
+{
+  "chart_id": "workout_completion",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "partial",
+  "title": "課表目標與實際完成",
+  "decision_question": "這堂課是否按原定課表完成？",
+  "analysis_mode": "actual_only",
+  "planned_data_status": "unavailable",
+  "workout_source": null,
+  "alignment_method": "inferred_pattern",
+  "alignment_confidence": "medium",
+  "period": {
+    "start_date": "2026-07-20",
+    "end_date": "2026-07-20",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {
+    "segment_count": 9,
+    "stable_segment_count": 6,
+    "late_session_fade_pct": 4.1,
+    "actual_only": true
+  },
+  "axes": {
+    "x": { "label": "區段", "unit": "segment", "scale": "ordinal" },
+    "y_left": { "label": "配速 / 心率", "unit": "sec_per_km|bpm", "scale": "linear" }
+  },
+  "series": [
+    {
+      "series_id": "actual_pace",
+      "label": "實際配速",
+      "type": "line",
+      "unit": "sec_per_km",
+      "axis": "left",
+      "display_precision": 0,
+      "hidden_by_default": false,
+      "source_method": "coachos_derived",
+      "data_quality_status": "available",
+      "points": [
+        { "x": "1", "y": 326, "status": "available", "source": "workout_execution_segment_view" },
+        { "x": "2", "y": 321, "status": "available", "source": "workout_execution_segment_view" }
+      ]
+    }
+  ],
+  "reference_bands": [],
+  "annotations": [
+    {
+      "annotation_id": "no_plan_note",
+      "type": "info",
+      "x": "1",
+      "label": "沒有正式課表",
+      "detail": "改以實際執行分析",
+      "rule_id": "workout_actual_only_v0.1",
+      "severity": "low"
+    }
+  ],
+  "verdict": {
+    "status": "info",
+    "code": "WORKOUT_ACTUAL_ONLY",
+    "headline": "未取得正式課表，先看實際執行",
+    "message": "這次沒有正式課表資料，因此不顯示達標判讀，只做分段穩定性分析。",
+    "confidence": "medium",
+    "rule_id": "workout_actual_only_v0.1",
+    "evidence": [
+      { "metric": "late_session_fade_pct", "value": 4.1, "unit": "%" }
+    ],
+    "limitations": [
+      "未取得原始課表"
+    ]
+  },
+  "data_quality": {
+    "overall_status": "partial",
+    "completeness_score": 0.82,
+    "confidence": "medium",
+    "missing_fields": [
+      "planned_segments",
+      "target_compliance_pct"
+    ],
+    "estimated_fields": [],
+    "invalid_fields": [],
+    "coverage": {
+      "planned_segments_pct": 0,
+      "execution_segments_pct": 100
+    },
+    "limitations": [
+      "只能做 actual-only execution analysis"
+    ]
+  },
+  "drill_down": {
+    "enabled": true,
+    "target_type": "activity",
+    "target_id": "activity_8892",
+    "fields": [
+      "segment_id",
+      "actual_pace_sec_per_km",
+      "actual_duration_s",
+      "average_heart_rate_bpm"
+    ],
+    "notes": [
+      "不提供正式達標與未達標判斷"
+    ]
+  },
+  "empty_state": {
+    "title": "目前沒有足夠資料",
+    "message": "這次沒有原始課表，因此只顯示實際執行分析。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

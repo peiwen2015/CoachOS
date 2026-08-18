@@ -233,6 +233,29 @@ CREATE TABLE IF NOT EXISTS kilometer_split (
 CREATE INDEX IF NOT EXISTS idx_kilometer_split_activity_id
     ON kilometer_split(activity_id);
 
+CREATE TABLE IF NOT EXISTS activity_sample (
+    activity_id INTEGER NOT NULL REFERENCES activity(id) ON DELETE CASCADE,
+    sample_index INTEGER NOT NULL CHECK (sample_index >= 0),
+    elapsed_offset_s REAL NOT NULL CHECK (elapsed_offset_s >= 0),
+    distance_m REAL CHECK (distance_m IS NULL OR distance_m >= 0),
+    heart_rate_bpm INTEGER CHECK (
+        heart_rate_bpm IS NULL OR heart_rate_bpm BETWEEN 30 AND 240
+    ),
+    power_w INTEGER CHECK (
+        power_w IS NULL OR power_w >= 0
+    ),
+    power_source_system TEXT,
+    power_measurement_method TEXT,
+    sample_quality_status TEXT NOT NULL DEFAULT 'valid' CHECK (
+        sample_quality_status IN ('valid', 'partial', 'invalid')
+    ),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (activity_id, sample_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_sample_activity_offset
+    ON activity_sample(activity_id, elapsed_offset_s);
+
 CREATE TABLE IF NOT EXISTS activity_workout_structure (
     activity_id INTEGER PRIMARY KEY REFERENCES activity(id) ON DELETE CASCADE,
     has_workout_structure INTEGER NOT NULL CHECK (has_workout_structure IN (0, 1)),

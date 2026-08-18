@@ -25,6 +25,18 @@ DROP VIEW IF EXISTS weekly_summary_view;
 DROP VIEW IF EXISTS platform_summary_view;
 DROP VIEW IF EXISTS activity_review_view;
 
+CREATE TABLE IF NOT EXISTS weekly_review_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    boundary_mode TEXT NOT NULL DEFAULT 'rolling'
+        CHECK (boundary_mode IN ('rolling', 'fixed')),
+    first_weekday INTEGER NOT NULL DEFAULT 1
+        CHECK (first_weekday BETWEEN 0 AND 6),
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT OR IGNORE INTO weekly_review_settings (id, boundary_mode, first_weekday)
+VALUES (1, 'rolling', 1);
+
 CREATE VIEW activity_review_view AS
 WITH primary_purpose AS (
     SELECT
@@ -57,6 +69,7 @@ SELECT
     activity_view.duration_sec,
     activity_view.avg_pace_sec_per_km,
     activity_view.avg_hr,
+    activity_view.avg_power_w,
     activity_view.max_hr,
     activity_view.training_load,
     activity_view.training_effect_aerobic,
@@ -140,18 +153,61 @@ anchor AS (
     SELECT DATE(MAX(activity_start_time)) AS latest_date
     FROM activity
 ),
+settings AS (
+    SELECT boundary_mode, first_weekday
+    FROM weekly_review_settings
+    WHERE id = 1
+),
+current_boundary AS (
+    SELECT
+        anchor.latest_date,
+        CASE
+            WHEN settings.boundary_mode = 'fixed'
+            THEN DATE(
+                anchor.latest_date,
+                printf(
+                    '-%d day',
+                    (CAST(strftime('%w', anchor.latest_date) AS INTEGER) - settings.first_weekday + 7) % 7
+                )
+            )
+            ELSE DATE(anchor.latest_date, '-6 day')
+        END AS current_start_date,
+        settings.boundary_mode,
+        settings.first_weekday
+    FROM anchor
+    CROSS JOIN settings
+),
 weeks AS (
     SELECT
         week_offsets.week_offset,
-        DATE(anchor.latest_date, printf('-%d day', week_offsets.week_offset * 7 + 6)) AS start_date,
-        DATE(anchor.latest_date, printf('-%d day', week_offsets.week_offset * 7)) AS end_date
+        DATE(current_boundary.current_start_date, printf('-%d day', week_offsets.week_offset * 7)) AS start_date,
+        DATE(current_boundary.current_start_date, printf('-%d day', week_offsets.week_offset * 7), '+6 day') AS end_date,
+        current_boundary.latest_date,
+        current_boundary.boundary_mode,
+        current_boundary.first_weekday
     FROM week_offsets
-    CROSS JOIN anchor
+    CROSS JOIN current_boundary
 )
 SELECT
     weeks.week_offset,
     weeks.start_date,
     weeks.end_date,
+    weeks.latest_date,
+    weeks.boundary_mode,
+    weeks.first_weekday,
+    CASE WHEN weeks.week_offset = 0 AND weeks.end_date > weeks.latest_date THEN 1 ELSE 0 END AS is_partial_week,
+    CASE
+        WHEN weeks.week_offset = 0 AND weeks.latest_date < weeks.start_date THEN 0
+        WHEN weeks.week_offset = 0 AND weeks.latest_date < weeks.end_date
+        THEN CAST(julianday(weeks.latest_date) - julianday(weeks.start_date) + 1 AS INTEGER)
+        ELSE 7
+    END AS elapsed_days,
+    CASE
+        WHEN weeks.week_offset = 0 AND weeks.latest_date < weeks.start_date THEN 0.0
+        WHEN weeks.week_offset = 0 AND weeks.latest_date < weeks.end_date
+        THEN ROUND(((julianday(weeks.latest_date) - julianday(weeks.start_date) + 1) / 7.0) * 100, 1)
+        ELSE 100.0
+    END AS progress_pct,
     COUNT(activity_review_view.activity_id) AS activities,
     COALESCE(ROUND(SUM(activity_review_view.distance_km), 2), 0) AS total_km,
     COALESCE(SUM(activity_review_view.duration_sec), 0) AS total_time_sec,
@@ -168,7 +224,10 @@ LEFT JOIN activity_review_view
 GROUP BY
     weeks.week_offset,
     weeks.start_date,
-    weeks.end_date
+    weeks.end_date,
+    weeks.boundary_mode,
+    weeks.first_weekday,
+    weeks.latest_date
 ORDER BY weeks.week_offset;
 
 CREATE VIEW current_week_summary_view AS

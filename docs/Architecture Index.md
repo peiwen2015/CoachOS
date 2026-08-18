@@ -52,6 +52,13 @@ Application
 | Journey Experience Blueprint | v0.1 | Product blueprint | Evolving | `00_Governance/Journey Experience Blueprint v0.1.md` |
 | Worldview Milestones | v1.0 | Governance | Stable | `00_Governance/Worldview Milestones.md` |
 | Product UX Polish Sprint | v1.0 | Working plan | Evolving | `00_Governance/Product UX Polish Sprint v1.0.md` |
+| CoachOS Chart Priorities | v0.1 | Governance | Draft | `00_Governance/CoachOS Chart Priorities v0.1.md` |
+| CoachOS Chart Requirements Specification | v0.1 | Governance | Draft | `00_Governance/CoachOS Chart Requirements Specification v0.1.md` |
+| CoachOS Chart Semantic View and Data Field Mapping | v0.1 | Governance | Draft | `00_Governance/CoachOS Chart Semantic View and Data Field Mapping v0.1.md` |
+| CoachOS Chart Semantic View SQL Draft | v0.1 | Physical model draft | Draft | `30_Physical_Model/CoachOS Chart Semantic View SQL Draft v0.1.sql` |
+| CoachOS Chart Semantic View SQL Notes | v0.1 | Metric notes | Draft | `30_Physical_Model/CoachOS Chart Semantic View SQL Notes v0.1.md` |
+| CoachOS Chart Rendering Contract | v0.1 | Architecture | Draft | `20_Architecture/CoachOS Chart Rendering Contract v0.1.md` |
+| CoachOS Chart API Payload Examples | v0.1 | Architecture | Draft | `20_Architecture/CoachOS Chart API Payload Examples v0.1.md` |
 | Architecture Roadmap | v1.0 | Governance | Evolving | `00_Governance/Architecture Roadmap.md` |
 | Architecture Decision Records | 5 records | Decision record | Stable | `01_ADR/` |
 | Canonical Data Model Release Notes | v1.0 | Governance | Stable | `00_Governance/Canonical Data Model Release Notes.md` |

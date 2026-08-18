@@ -1,0 +1,61 @@
+{
+  "chart_id": "weekly_intensity_distribution",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "insufficient_data",
+  "title": "週訓練強度分布",
+  "decision_question": "我的訓練是否仍以低強度為主？",
+  "period": {
+    "start_date": "2026-07-13",
+    "end_date": "2026-07-19",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {},
+  "axes": {},
+  "series": [],
+  "reference_bands": [],
+  "annotations": [],
+  "verdict": {
+    "status": "unknown",
+    "code": "INTENSITY_INSUFFICIENT",
+    "headline": "資料不足，無法形成強度分布",
+    "message": "目前沒有足夠的 zone 或活動分類資料。",
+    "confidence": "low",
+    "rule_id": "weekly_intensity_insufficient_v0.1",
+    "evidence": [],
+    "limitations": [
+      "insufficient classification data"
+    ]
+  },
+  "data_quality": {
+    "overall_status": "insufficient_data",
+    "completeness_score": 0.16,
+    "confidence": "low",
+    "missing_fields": [
+      "intensity_category"
+    ],
+    "estimated_fields": [],
+    "invalid_fields": [],
+    "coverage": {
+      "classification_pct": 16,
+      "zone_pct": 0
+    },
+    "limitations": [
+      "分類資料不足"
+    ]
+  },
+  "drill_down": {
+    "enabled": false,
+    "target_type": "period",
+    "target_id": null,
+    "fields": [],
+    "notes": []
+  },
+  "empty_state": {
+    "title": "資料還不夠",
+    "message": "請先累積更多已分類的活動。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

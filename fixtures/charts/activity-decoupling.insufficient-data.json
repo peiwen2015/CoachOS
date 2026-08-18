@@ -1,0 +1,62 @@
+{
+  "chart_id": "activity_decoupling",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "insufficient_data",
+  "title": "配速與心率解耦",
+  "decision_question": "這次跑步後段是否失去穩定性？",
+  "period": {
+    "start_date": "2026-07-18",
+    "end_date": "2026-07-18",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {},
+  "axes": {},
+  "series": [],
+  "reference_bands": [],
+  "annotations": [],
+  "verdict": {
+    "status": "unknown",
+    "code": "DRIFT_INSUFFICIENT",
+    "headline": "資料不足，無法判讀解耦",
+    "message": "目前缺少足夠的心率或分段資料。",
+    "confidence": "low",
+    "rule_id": "activity_decoupling_insufficient_v0.1",
+    "evidence": [],
+    "limitations": [
+      "heart-rate sampling too sparse"
+    ]
+  },
+  "data_quality": {
+    "overall_status": "insufficient_data",
+    "completeness_score": 0.21,
+    "confidence": "low",
+    "missing_fields": [
+      "heart_rate_bpm"
+    ],
+    "estimated_fields": [],
+    "invalid_fields": [],
+    "coverage": {
+      "heart_rate_pct": 18,
+      "pace_pct": 100,
+      "split_pct": 28
+    },
+    "limitations": [
+      "心率取樣太稀疏"
+    ]
+  },
+  "drill_down": {
+    "enabled": false,
+    "target_type": "activity",
+    "target_id": null,
+    "fields": [],
+    "notes": []
+  },
+  "empty_state": {
+    "title": "資料還不夠",
+    "message": "這張圖需要更多心率與分段資料。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

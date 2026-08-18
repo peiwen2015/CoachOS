@@ -113,6 +113,12 @@ Examples:
 
 - `Month-to-date`
 - `Baseline still building`
+
+For weekly review, period completeness is also a product state. In rolling mode,
+the review window may continue to be anchored to the latest available activity.
+In fixed-week mode, an unfinished current week must be shown as a progress
+snapshot, not interpreted as a closed weekly verdict or compared with closed
+weeks as if it were complete.
 - `Not enough tagged data`
 - `Confidence: Medium`
 

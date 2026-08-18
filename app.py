@@ -211,14 +211,10 @@ def workbook_summary(path):
         for row in rows
         if isinstance(row[4], (int, float)) and isinstance(row[2], (int, float))
     ]
-    avg_power_pairs = [
-        (row[8], row[2])
-        for row in rows
-        if isinstance(row[8], (int, float)) and isinstance(row[2], (int, float))
-    ]
-    avg_power_text = info.get("平均功率") or info.get("Average Power") or (
-        f"{weighted_average(avg_power_pairs, 1)} W" if avg_power_pairs else ""
-    )
+    # Activity average power is only authoritative when supplied at activity level.
+    # Per-kilometer power remains split evidence and must not be promoted to an
+    # official activity average by deriving it here.
+    avg_power_text = info.get("平均功率") or info.get("Average Power") or ""
 
     summary = [
         ("活動日期", info.get("活動日期")),

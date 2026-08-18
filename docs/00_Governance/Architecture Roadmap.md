@@ -187,6 +187,8 @@ Verified with real project data:
 - `2453` kilometer splits created.
 - `shoe`, `workout_type`, and `training_purpose` reference data seeded/upserted.
 - `fit_sha256` idempotent upsert verified by repeating the full import.
+- Existing shoe lifecycle fields remain user-owned during repeated imports;
+  reference-data upsert must not reactivate a retired shoe.
 - `activity_view`, `kilometer_split_view`, `activity_training_purpose_view`, and `shoe_statistics_view` query successfully.
 - Derived pace fields are calculated by views, not stored in core fact tables.
 - Foreign key check is clean.

@@ -2216,7 +2216,12 @@ def upsert_dimension(connection, table, code_column, row):
     ).fetchone()
     columns = list(row)
     if existing:
-        update_columns = [column for column in columns if column != code_column]
+        update_columns = [
+            column
+            for column in columns
+            if column != code_column
+            and not (table == "shoe" and column == "is_active")
+        ]
         assignments = ", ".join(f"{column} = ?" for column in update_columns)
         values = [row[column] for column in update_columns]
         values.append(row[code_column])

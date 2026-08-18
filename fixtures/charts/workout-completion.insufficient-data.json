@@ -1,0 +1,67 @@
+{
+  "chart_id": "workout_completion",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "insufficient_data",
+  "title": "課表目標與實際完成",
+  "decision_question": "這堂課是否按原定課表完成？",
+  "analysis_mode": "goal_vs_actual",
+  "planned_data_status": "unavailable",
+  "workout_source": null,
+  "alignment_method": "unavailable",
+  "alignment_confidence": "low",
+  "period": {
+    "start_date": "2026-07-20",
+    "end_date": "2026-07-20",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {},
+  "axes": {},
+  "series": [],
+  "reference_bands": [],
+  "annotations": [],
+  "verdict": {
+    "status": "unknown",
+    "code": "WORKOUT_INSUFFICIENT",
+    "headline": "資料不足，暫時無法判斷完成度",
+    "message": "目前沒有足夠的課表或執行資料，無法形成可靠判讀。",
+    "confidence": "low",
+    "rule_id": "workout_completion_insufficient_v0.1",
+    "evidence": [],
+    "limitations": [
+      "planned and execution data both missing"
+    ]
+  },
+  "data_quality": {
+    "overall_status": "insufficient_data",
+    "completeness_score": 0.12,
+    "confidence": "low",
+    "missing_fields": [
+      "planned_segments",
+      "execution_segments"
+    ],
+    "estimated_fields": [],
+    "invalid_fields": [],
+    "coverage": {
+      "planned_segments_pct": 0,
+      "execution_segments_pct": 0
+    },
+    "limitations": [
+      "缺少課表與執行資料"
+    ]
+  },
+  "drill_down": {
+    "enabled": false,
+    "target_type": "activity",
+    "target_id": null,
+    "fields": [],
+    "notes": []
+  },
+  "empty_state": {
+    "title": "資料還不夠",
+    "message": "請先讓系統取得課表或更多執行資料。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

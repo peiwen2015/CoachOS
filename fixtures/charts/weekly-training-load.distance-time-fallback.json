@@ -1,0 +1,110 @@
+{
+  "chart_id": "weekly_training_load",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "partial",
+  "title": "週訓練負荷趨勢",
+  "decision_question": "最近的訓練負荷是否穩定且合理？",
+  "period": {
+    "start_date": "2026-07-06",
+    "end_date": "2026-07-19",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {
+    "current_week_distance_km": 44.9,
+    "current_week_duration_hr": 4.6,
+    "trend_direction": "flat"
+  },
+  "axes": {
+    "x": { "label": "週次", "unit": "week", "scale": "time" },
+    "y_left": { "label": "里程 / 時間", "unit": "km|hr", "scale": "linear" }
+  },
+  "series": [
+    {
+      "series_id": "weekly_distance",
+      "label": "週里程",
+      "type": "line",
+      "unit": "km",
+      "axis": "left",
+      "display_precision": 1,
+      "hidden_by_default": false,
+      "source_method": "coachos_derived",
+      "data_quality_status": "available",
+      "points": [
+        { "x": "2026-07-06", "y": 43.8, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-07-13", "y": 44.9, "status": "available", "source": "weekly_training_load_view" }
+      ]
+    },
+    {
+      "series_id": "weekly_duration",
+      "label": "週訓練時間",
+      "type": "line",
+      "unit": "hr",
+      "axis": "right",
+      "display_precision": 1,
+      "hidden_by_default": false,
+      "source_method": "coachos_derived",
+      "data_quality_status": "available",
+      "points": [
+        { "x": "2026-07-06", "y": 4.5, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-07-13", "y": 4.6, "status": "available", "source": "weekly_training_load_view" }
+      ]
+    }
+  ],
+  "reference_bands": [],
+  "annotations": [],
+  "verdict": {
+    "status": "partial",
+    "code": "LOAD_FALLBACK_DISTANCE_ONLY",
+    "headline": "目前無法顯示負荷，但可先看里程與時間",
+    "message": "training load 缺失，因此此圖降級為距離與時間趨勢。",
+    "confidence": "medium",
+    "rule_id": "weekly_load_fallback_v0.1",
+    "evidence": [
+      { "metric": "current_week_distance_km", "value": 44.9, "unit": "km" },
+      { "metric": "current_week_duration_hr", "value": 4.6, "unit": "hr" }
+    ],
+    "limitations": [
+      "training load unavailable"
+    ]
+  },
+  "data_quality": {
+    "overall_status": "partial",
+    "completeness_score": 0.63,
+    "confidence": "medium",
+    "missing_fields": [
+      "weekly_training_load",
+      "acute_chronic_ratio"
+    ],
+    "estimated_fields": [],
+    "invalid_fields": [],
+    "coverage": {
+      "training_load_pct": 0,
+      "distance_pct": 100,
+      "duration_pct": 100
+    },
+    "limitations": [
+      "降級為里程與時間趨勢"
+    ]
+  },
+  "drill_down": {
+    "enabled": true,
+    "target_type": "week",
+    "target_id": "2026-W29",
+    "fields": [
+      "activity_id",
+      "distance_km",
+      "duration_sec"
+    ],
+    "notes": [
+      "可先檢查週內活動是否都有完整 training load"
+    ]
+  },
+  "empty_state": {
+    "title": "目前沒有足夠資料",
+    "message": "這張圖已降級為距離與時間，不再顯示負荷判讀。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

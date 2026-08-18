@@ -1,0 +1,104 @@
+{
+  "chart_id": "weekly_intensity_distribution",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "partial",
+  "title": "週訓練強度分布",
+  "decision_question": "我的訓練是否仍以低強度為主？",
+  "period": {
+    "start_date": "2026-06-22",
+    "end_date": "2026-07-19",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {
+    "period_type": "rolling_4w",
+    "dominant_band": "low",
+    "zone_system": "workout_type_intensity_category"
+  },
+  "axes": {
+    "x": { "label": "強度", "unit": "category", "scale": "ordinal" },
+    "y_left": { "label": "活動數", "unit": "count", "scale": "linear" }
+  },
+  "series": [
+    {
+      "series_id": "intensity_distribution",
+      "label": "強度分布",
+      "type": "bar",
+      "unit": "count",
+      "axis": "left",
+      "display_precision": 0,
+      "hidden_by_default": false,
+      "source_method": "training_balance_view",
+      "data_quality_status": "partial",
+      "points": [
+        { "x": "Recovery", "y": 4, "status": "available", "source": "weekly_intensity_distribution_view" },
+        { "x": "Easy", "y": 16, "status": "available", "source": "weekly_intensity_distribution_view" },
+        { "x": "Moderate", "y": 2, "status": "available", "source": "weekly_intensity_distribution_view" },
+        { "x": "Hard", "y": 1, "status": "available", "source": "weekly_intensity_distribution_view" }
+      ]
+    }
+  ],
+  "reference_bands": [],
+  "annotations": [
+    {
+      "annotation_id": "zone_fallback",
+      "type": "info",
+      "x": "Easy",
+      "label": "改採活動分類",
+      "detail": "缺少 zone 資料，因此改用 workout_type intensity category",
+      "rule_id": "weekly_intensity_fallback_v0.1",
+      "severity": "low"
+    }
+  ],
+  "verdict": {
+    "status": "info",
+    "code": "INTENSITY_FALLBACK",
+    "headline": "缺少 zone 資料，先以活動分類代替",
+    "message": "目前沒有可靠的心率 zone 或功率 zone，因此改用活動分類來估算強度分布。",
+    "confidence": "medium",
+    "rule_id": "weekly_intensity_fallback_v0.1",
+    "evidence": [],
+    "limitations": [
+      "no heart-rate zone table",
+      "no power zone table"
+    ]
+  },
+  "data_quality": {
+    "overall_status": "partial",
+    "completeness_score": 0.73,
+    "confidence": "medium",
+    "missing_fields": [
+      "heart_rate_zone",
+      "power_zone"
+    ],
+    "estimated_fields": [],
+    "invalid_fields": [],
+    "coverage": {
+      "classification_pct": 100,
+      "zone_pct": 0
+    },
+    "limitations": [
+      "改用 workout_type intensity category"
+    ]
+  },
+  "drill_down": {
+    "enabled": true,
+    "target_type": "period",
+    "target_id": "rolling_4w",
+    "fields": [
+      "activity_id",
+      "workout_type",
+      "training_purpose"
+    ],
+    "notes": [
+      "此圖使用 fallback zone system"
+    ]
+  },
+  "empty_state": {
+    "title": "目前沒有足夠資料",
+    "message": "這張圖沒有 zone 資料，因此只能顯示分類分布。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

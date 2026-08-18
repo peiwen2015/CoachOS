@@ -11,17 +11,25 @@ def _latest_activity_date(connection: sqlite3.Connection) -> date | None:
     return date.fromisoformat(str(row["latest_date"]))
 
 
-def _week_window(anchor: date, week_offset: int) -> tuple[date, date]:
-    end_date = anchor - timedelta(days=week_offset * 7)
-    start_date = end_date - timedelta(days=6)
-    return start_date, end_date
+def _week_window(connection: sqlite3.Connection, week_offset: int) -> tuple[date, date] | None:
+    row = connection.execute(
+        "SELECT start_date, end_date FROM weekly_summary_view WHERE week_offset = ?",
+        (week_offset,),
+    ).fetchone()
+    if not row or not row["start_date"] or not row["end_date"]:
+        return None
+    return date.fromisoformat(str(row["start_date"])), date.fromisoformat(str(row["end_date"]))
 
 
 def _week_summary(connection: sqlite3.Connection, week_offset: int) -> dict | None:
-    latest_date = _latest_activity_date(connection)
-    if latest_date is None:
+    window = _week_window(connection, week_offset)
+    if window is None:
         return None
-    start_date, end_date = _week_window(latest_date, week_offset)
+    start_date, end_date = window
+    period_row = connection.execute(
+        "SELECT is_partial_week, boundary_mode FROM weekly_summary_view WHERE week_offset = ?",
+        (week_offset,),
+    ).fetchone()
     row = connection.execute(
         """
         SELECT
@@ -80,6 +88,8 @@ def _week_summary(connection: sqlite3.Connection, week_offset: int) -> dict | No
         previous = current
 
     data = dict(row)
+    data["is_partial_week"] = bool(period_row["is_partial_week"]) if period_row else False
+    data["boundary_mode"] = str(period_row["boundary_mode"]) if period_row else "rolling"
     data["consecutive_training_days"] = best_streak
     data["start_date"] = start_date.isoformat()
     data["end_date"] = end_date.isoformat()
@@ -179,6 +189,8 @@ def fetch_weekly_signals(connection: sqlite3.Connection, week_offset: int = 0) -
         "period_start": current["start_date"],
         "period_end": current["end_date"],
         "week_offset": week_offset,
+        "boundary_mode": current["boundary_mode"],
+        "is_partial_week": current["is_partial_week"],
         "weekly_activity_count": int(current["activities"] or 0),
         "weekly_distance_km": float(current["total_km"] or 0),
         "weekly_training_load": float(current["training_load"] or 0),

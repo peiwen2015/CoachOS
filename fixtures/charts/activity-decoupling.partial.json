@@ -1,0 +1,90 @@
+{
+  "chart_id": "activity_decoupling",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "partial",
+  "title": "配速與心率解耦",
+  "decision_question": "這次跑步後段是否失去穩定性？",
+  "period": {
+    "start_date": "2026-07-18",
+    "end_date": "2026-07-18",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {
+    "sample_quality_status": "partial"
+  },
+  "axes": {
+    "x": { "label": "時間", "unit": "split", "scale": "ordinal" },
+    "y_left": { "label": "配速", "unit": "sec_per_km", "scale": "linear" },
+    "y_right": { "label": "心率", "unit": "bpm", "scale": "linear" }
+  },
+  "series": [
+    {
+      "series_id": "pace",
+      "label": "配速",
+      "type": "line",
+      "unit": "sec_per_km",
+      "axis": "left",
+      "display_precision": 0,
+      "hidden_by_default": false,
+      "source_method": "activity_timeseries_view",
+      "data_quality_status": "partial",
+      "points": [
+        { "x": "1", "y": 318, "status": "available", "source": "activity_decoupling_view" },
+        { "x": "2", "y": 321, "status": "available", "source": "activity_decoupling_view" }
+      ]
+    }
+  ],
+  "reference_bands": [],
+  "annotations": [],
+  "verdict": {
+    "status": "info",
+    "code": "STABLE_WITH_LIMITS",
+    "headline": "目前看起來穩定，但心率覆蓋不完整",
+    "message": "配速趨勢可讀，但心率資料不足，只能做有限判讀。",
+    "confidence": "medium",
+    "rule_id": "activity_decoupling_partial_v0.1",
+    "evidence": [],
+    "limitations": [
+      "心率覆蓋率不足"
+    ]
+  },
+  "data_quality": {
+    "overall_status": "partial",
+    "completeness_score": 0.67,
+    "confidence": "medium",
+    "missing_fields": [
+      "heart_rate_bpm"
+    ],
+    "estimated_fields": [],
+    "invalid_fields": [],
+    "coverage": {
+      "heart_rate_pct": 44,
+      "pace_pct": 100,
+      "split_pct": 100
+    },
+    "limitations": [
+      "心率覆蓋不足"
+    ]
+  },
+  "drill_down": {
+    "enabled": true,
+    "target_type": "activity",
+    "target_id": "activity_9922",
+    "fields": [
+      "split_index",
+      "split_distance_m",
+      "elapsed_time_sec"
+    ],
+    "notes": [
+      "此圖不提供強判讀"
+    ]
+  },
+  "empty_state": {
+    "title": "目前沒有足夠資料",
+    "message": "配速有資料，但心率不足，無法形成完整解耦判讀。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

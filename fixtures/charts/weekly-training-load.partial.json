@@ -1,0 +1,103 @@
+{
+  "chart_id": "weekly_training_load",
+  "schema_version": "0.1",
+  "generated_at": "2026-07-20T08:00:00Z",
+  "athlete_id": "athlete_123",
+  "status": "partial",
+  "title": "週訓練負荷趨勢",
+  "decision_question": "最近的訓練負荷是否穩定且合理？",
+  "period": {
+    "start_date": "2026-06-01",
+    "end_date": "2026-07-19",
+    "timezone": "Asia/Taipei"
+  },
+  "summary": {
+    "current_week_load": 288,
+    "previous_week_load": 301,
+    "change_wow_pct": -4.3,
+    "current_week_distance_km": 41.5,
+    "current_week_duration_hr": 4.2,
+    "phase_label": "build"
+  },
+  "axes": {
+    "x": { "label": "週次", "unit": "week", "scale": "time" },
+    "y_left": { "label": "負荷 / 里程", "unit": "load|km", "scale": "linear" }
+  },
+  "series": [
+    {
+      "series_id": "weekly_distance",
+      "label": "週里程",
+      "type": "line",
+      "unit": "km",
+      "axis": "left",
+      "display_precision": 1,
+      "hidden_by_default": false,
+      "source_method": "coachos_derived",
+      "data_quality_status": "partial",
+      "points": [
+        { "x": "2026-06-01", "y": 32.1, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-06-08", "y": 35.8, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-06-15", "y": 38.4, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-06-22", "y": 36.0, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-06-29", "y": 39.0, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-07-06", "y": 41.2, "status": "available", "source": "weekly_training_load_view" },
+        { "x": "2026-07-13", "y": 41.5, "status": "available", "source": "weekly_training_load_view" }
+      ]
+    }
+  ],
+  "reference_bands": [],
+  "annotations": [],
+  "verdict": {
+    "status": "info",
+    "code": "LOAD_PARTIAL",
+    "headline": "負荷趨勢可判讀，但負荷欄位不完整",
+    "message": "本週可顯示里程與時間趨勢，但部分訓練負荷資料缺失。",
+    "confidence": "medium",
+    "rule_id": "weekly_load_partial_v0.1",
+    "evidence": [
+      { "metric": "change_wow_pct", "value": -4.3, "unit": "%" }
+    ],
+    "limitations": [
+      "部分活動未提供 training load"
+    ]
+  },
+  "data_quality": {
+    "overall_status": "partial",
+    "completeness_score": 0.71,
+    "confidence": "medium",
+    "missing_fields": [
+      "weekly_training_load",
+      "acute_chronic_ratio"
+    ],
+    "estimated_fields": [],
+    "invalid_fields": [],
+    "coverage": {
+      "training_load_pct": 54,
+      "distance_pct": 100,
+      "duration_pct": 100
+    },
+    "limitations": [
+      "訓練負荷資料不足"
+    ]
+  },
+  "drill_down": {
+    "enabled": true,
+    "target_type": "week",
+    "target_id": "2026-W28",
+    "fields": [
+      "activity_id",
+      "distance_km",
+      "duration_sec",
+      "training_load"
+    ],
+    "notes": [
+      "可查看哪些活動缺少 training load"
+    ]
+  },
+  "empty_state": {
+    "title": "目前沒有足夠資料",
+    "message": "這張圖仍可部分顯示，但完整負荷判讀需要更多資料。",
+    "action_label": "查看最近活動",
+    "action_target": "/?page=activity"
+  }
+}

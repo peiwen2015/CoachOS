@@ -184,12 +184,27 @@ Weekly should not be treated as a seven-day summary.
 
 It should be treated as a progression layer.
 
+The weekly period has two supported boundary modes:
+
+- rolling mode: the latest available activity date anchors a seven-day window
+- fixed-week mode: the runner chooses the first weekday and the week runs for
+  seven calendar days
+
+Only a closed fixed week should produce the formal weekly progression verdict.
+An unfinished fixed week produces a current-week progress snapshot and carries
+an explicit completeness state; it should not create a strong verdict,
+recommendation, or baseline comparison.
+
 This layer creates knowledge such as:
 
 - weekly direction
 - progression confidence
 - build / recovery / stability / absorption reading
 - whether the week stayed on plan or drifted away
+
+The formal weekly read and the current-week progress snapshot are separate
+outputs. The snapshot reports accumulation so far; the formal read explains
+what a completed period means.
 
 Weekly should consume:
 

@@ -65,6 +65,37 @@ This chapter applies the broader CoachOS Interaction Principles in the tagging w
 - Use it for repetitive fixes, not for every decision.
 - Show whether the batch changed a core signal or only a display field.
 
+### Shoe Category Editing
+
+Shoe category is descriptive metadata and may contain more than one value. The
+shoe editor must therefore:
+
+- present the controlled category vocabulary as a multi-select control
+- show all available options without requiring an inner scroll for the current vocabulary size
+- render multiple selected categories as separate lines in the shoe overview rather than one compressed text run
+- preserve every selected value after save and reload
+- render an empty value as `未分類`, without treating it as a missing shoe tag
+- remain compatible with legacy single-category records
+
+The selected category values describe what the shoe can be used for. They are
+not a default workout type and must not be used to infer the purpose of a
+specific activity.
+
+The standard vocabulary is:
+
+1. `Recovery`
+2. `Easy / Aerobic`
+3. `Steady / Progression`
+4. `Long Run`
+5. `Tempo / Threshold / HM Pace`
+6. `Speed / Interval / Strides`
+7. `Race`
+
+This vocabulary is intentionally based on training role rather than brand or
+construction. Existing shoes that still contain a retired category must be
+explicitly reclassified; the product does not silently map old values to a new
+training role.
+
 ## Governance Rules
 
 - Suggestions must never overwrite governed metadata without confirmation.

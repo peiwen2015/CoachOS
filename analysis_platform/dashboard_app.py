@@ -240,16 +240,62 @@ PURPOSE_CATEGORY_OPTIONS = [
 ]
 
 SHOE_CATEGORY_OPTIONS = [
-    ("Daily Trainer", "Daily Trainer"),
-    ("Recovery", "Recovery"),
-    ("Long Run", "Long Run"),
-    ("Tempo", "Tempo"),
-    ("Speed", "Speed / Interval"),
-    ("Race", "Race"),
-    ("Trail", "Trail"),
-    ("Treadmill", "Treadmill"),
-    ("Other", "Other"),
+    ("recovery", "Recovery"),
+    ("easy_aerobic", "Easy / Aerobic"),
+    ("steady_progression", "Steady / Progression"),
+    ("long_run", "Long Run"),
+    ("tempo_threshold_hm_pace", "Tempo / Threshold / HM Pace"),
+    ("speed_interval_strides", "Speed / Interval / Strides"),
+    ("race", "Race"),
 ]
+
+def shoe_category_options(value=None):
+    return list(SHOE_CATEGORY_OPTIONS)
+
+
+def shoe_category_values(value):
+    """Read both legacy single-value categories and the current JSON list."""
+    if isinstance(value, (list, tuple)):
+        raw_values = value
+    else:
+        text = str(value or "").strip()
+        if not text:
+            return []
+        try:
+            decoded = json.loads(text)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            decoded = None
+        if isinstance(decoded, list):
+            raw_values = decoded
+        elif isinstance(decoded, str):
+            raw_values = [decoded]
+        else:
+            raw_values = [part.strip() for part in text.split(",")]
+    return list(dict.fromkeys(str(item).strip() for item in raw_values if str(item).strip()))
+
+
+def serialize_shoe_categories(value):
+    values = shoe_category_values(value)
+    return json.dumps(values, ensure_ascii=False, separators=(",", ":")) if values else ""
+
+
+def shoe_category_display(value):
+    labels = dict(SHOE_CATEGORY_OPTIONS)
+    values = shoe_category_values(value)
+    if not values:
+        return "未分類"
+    return "、".join(labels.get(item, "需重新選擇") for item in values)
+
+
+def shoe_category_lines_html(value):
+    labels = dict(SHOE_CATEGORY_OPTIONS)
+    values = shoe_category_values(value)
+    if not values:
+        values = ["未分類"]
+    return "".join(
+        f'<span class="shoe-category-line">{html.escape(labels.get(item, "需重新選擇"))}</span>'
+        for item in values
+    )
 
 WORKOUT_TYPE_DIMENSION_DEFAULTS = {
     "Recovery Run": ("recovery_run", "Recovery Run", "恢復跑", "Recovery", 0, 0, 1, 10, "#7CB7B8"),
@@ -524,7 +570,7 @@ def delete_ai_reply_attachment(surface, identifier, filename):
     return resolved.name
 
 
-def render_ai_reply_attachments(surface, identifier, page="", activity_id="", week="", month=""):
+def render_ai_reply_attachments(surface, identifier, page="", activity_id="", week="", month="", compare=""):
     attachments = list_ai_reply_attachments(surface, identifier)
     if not attachments:
         return '<p class="note">目前還沒有附加圖檔。</p>'
@@ -539,6 +585,7 @@ def render_ai_reply_attachments(surface, identifier, page="", activity_id="", we
             ("activity_id", activity_id),
             ("week", week),
             ("month", month),
+            ("compare", compare),
         ]
         cards.append(
             f"""
@@ -1976,7 +2023,7 @@ def reconcile_shoe_choice(connection, row):
 
 
 def save_shoe_dimension(connection, shoe_id, category):
-    category_value = str(category or "").strip()
+    category_value = serialize_shoe_categories(category)
     connection.execute(
         """
         UPDATE shoe
@@ -4807,7 +4854,7 @@ def overview_attention_payload(connection):
     }
 
 
-def ai_reply_saved_panel(title, existing_reply=None, return_page="", activity_id="", week="", month=""):
+def ai_reply_saved_panel(title, existing_reply=None, return_page="", activity_id="", week="", month="", compare=""):
     if not existing_reply:
         return ""
     raw_markdown = existing_reply.get("responseMarkdown", "")
@@ -4825,7 +4872,7 @@ def ai_reply_saved_panel(title, existing_reply=None, return_page="", activity_id
           <div class="ai-reply-rendered">{rendered}</div>
           <div class="ai-reply-attachments">
             <strong>附加圖檔</strong>
-            {render_ai_reply_attachments(existing_reply.get("scope", ""), existing_reply.get("analysisNodeId", ""), return_page, activity_id, week, month)}
+            {render_ai_reply_attachments(existing_reply.get("scope", ""), existing_reply.get("analysisNodeId", ""), return_page, activity_id, week, month, compare)}
           </div>
           <details class="ai-reply-raw">
             <summary>看原始 markdown</summary>
@@ -4836,7 +4883,7 @@ def ai_reply_saved_panel(title, existing_reply=None, return_page="", activity_id
     """
 
 
-def ai_reply_capture_panel(surface, identifier, title, return_page, existing_reply=None, activity_id="", week="", month=""):
+def ai_reply_capture_panel(surface, identifier, title, return_page, existing_reply=None, activity_id="", week="", month="", compare=""):
     rendered = ""
     raw_markdown = ""
     saved_note = "還沒有貼回過 AI 回覆。"
@@ -4858,7 +4905,7 @@ def ai_reply_capture_panel(surface, identifier, title, return_page, existing_rep
       <section class="panel-section">
         <h2>{action_title}</h2>
         <div class="review-card ai-handoff-card">
-          <span>AI Conversation Loop</span>
+          <span>AI 對話循環</span>
           <strong>把你跟 AI 往下聊出的結果存回這一頁</strong>
           <p>{lead}</p>
           <form method="post" action="/ai-replies/save" class="ai-reply-form remember-scroll-form">
@@ -4869,6 +4916,7 @@ def ai_reply_capture_panel(surface, identifier, title, return_page, existing_rep
             <input type="hidden" name="activity_id" value="{html.escape(str(activity_id), quote=True)}">
             <input type="hidden" name="week" value="{html.escape(str(week), quote=True)}">
             <input type="hidden" name="month" value="{html.escape(str(month), quote=True)}">
+            <input type="hidden" name="compare" value="{html.escape(str(compare), quote=True)}">
             <input type="hidden" name="scroll_y" value="">
             <label class="inline-field">
               <span>貼上 AI 回覆</span>
@@ -4891,6 +4939,7 @@ def ai_reply_capture_panel(surface, identifier, title, return_page, existing_rep
             <input type="hidden" name="activity_id" value="{html.escape(str(activity_id), quote=True)}">
             <input type="hidden" name="week" value="{html.escape(str(week), quote=True)}">
             <input type="hidden" name="month" value="{html.escape(str(month), quote=True)}">
+            <input type="hidden" name="compare" value="{html.escape(str(compare), quote=True)}">
             <input type="hidden" name="scroll_y" value="">
             <label class="inline-field">
               <span>附加圖檔</span>
@@ -4902,7 +4951,7 @@ def ai_reply_capture_panel(surface, identifier, title, return_page, existing_rep
           </form>
           <div class="ai-reply-attachments">
             <strong>目前附加圖檔</strong>
-            {render_ai_reply_attachments(surface, identifier, return_page, activity_id, week, month)}
+            {render_ai_reply_attachments(surface, identifier, return_page, activity_id, week, month, compare)}
           </div>
           <p class="note">{html.escape(saved_note)}</p>
         </div>
@@ -5493,8 +5542,7 @@ def recent_activities(connection, limit=10):
 
 
 def available_activities(connection, limit=500):
-    return connection.execute(
-        """
+    query = """
         SELECT
             activity_id,
             activity_start_time,
@@ -5506,10 +5554,1177 @@ def available_activities(connection, limit=500):
             primary_training_purpose_name_en
         FROM recent_activity_view
         ORDER BY activity_start_time DESC
-        LIMIT ?
-        """,
-        (limit,),
+    """
+    if limit is None:
+        return connection.execute(query).fetchall()
+    return connection.execute(query + " LIMIT ?", (limit,)).fetchall()
+
+
+def comparison_activity_rows(connection, activity_ids):
+    ids = []
+    for value in activity_ids or []:
+        try:
+            activity_id = int(value)
+        except (TypeError, ValueError):
+            continue
+        if activity_id > 0 and activity_id not in ids:
+            ids.append(activity_id)
+    if not ids:
+        return []
+    placeholders = ",".join("?" for _ in ids)
+    rows = connection.execute(
+        f"SELECT * FROM activity_review_view WHERE activity_id IN ({placeholders}) ORDER BY activity_start_time DESC",
+        ids,
     ).fetchall()
+    enriched = []
+    for row in rows:
+        item = dict(row)
+        item["segment_metrics"] = activity_segment_metrics(connection, row["activity_id"])
+        item["segment_intent"] = infer_segment_intent(row)
+        enriched.append(item)
+    return enriched
+
+
+def infer_segment_intent(row):
+    """Infer a conservative role from governed labels; never claim user intent."""
+    name = str(row["activity_name"] or row["activity_type"] or "").lower()
+    workout_type = str(row["workout_type_code"] or "").lower() if "workout_type_code" in row.keys() else ""
+    if "strides" in name or "stride" in name:
+        if "speed" in name or "interval" in name:
+            intent = "speed_exposure"
+        elif "mechanic" in name or "form" in name:
+            intent = "mechanics"
+        elif "fast" in name or "relaxed" in name:
+            intent = "fast_relaxed"
+        else:
+            intent = "activation"
+        return {"strides": {"intent": intent, "source": "derived_from_activity_label", "confidence": "low"}}
+    if any(token in workout_type or token in name for token in ("tempo", "threshold", "hm pace", "progression")):
+        primary_intent = "quality_work"
+    elif any(token in workout_type or token in name for token in ("long", "lsd")):
+        primary_intent = "aerobic_endurance"
+    else:
+        primary_intent = "aerobic_stability"
+    return {"primary_work": {"intent": primary_intent, "source": "derived_from_activity_label", "confidence": "low"}}
+
+
+def _weighted_segment_metric(rows, distance_key="split_distance_m"):
+    usable = [row for row in rows if row[distance_key] is not None and float(row[distance_key]) > 0]
+    distance_m = sum(float(row[distance_key]) for row in usable)
+    if not usable or distance_m <= 0:
+        return None
+    duration = sum(float(row["elapsed_time_sec"] or 0) for row in usable)
+    result = {
+        "distance_km": distance_m / 1000,
+        "duration_sec": duration,
+        "avg_pace_sec_per_km": duration / distance_m * 1000 if duration > 0 else None,
+    }
+    for field in ("avg_hr", "max_hr", "avg_power_w", "avg_cadence_spm", "avg_stride_length_mm", "avg_gct_ms"):
+        values = [(float(row[field]), float(row[distance_key])) for row in usable if row[field] is not None]
+        result[field] = sum(value * weight for value, weight in values) / sum(weight for _, weight in values) if values else None
+    return result
+
+
+def activity_segment_metrics(connection, activity_id):
+    """Return scope-specific metrics derived from verified workout splits and km splits."""
+    table_names = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    if "activity_workout_split" not in table_names or "kilometer_split" not in table_names:
+        return {"whole_activity": {"status": "not_assessable", "reason": "segment_tables_unavailable"}}
+    workout_rows = connection.execute(
+        "SELECT split_index, split_type, total_distance_m, total_timer_time_sec FROM activity_workout_split WHERE activity_id = ? ORDER BY split_index",
+        (activity_id,),
+    ).fetchall()
+    km_rows = connection.execute(
+        "SELECT * FROM kilometer_split WHERE activity_id = ? ORDER BY split_index",
+        (activity_id,),
+    ).fetchall()
+    if not workout_rows or not km_rows:
+        return {"whole_activity": {"status": "not_assessable", "reason": "segment_data_missing"}}
+    active_blocks = []
+    short_active_blocks = []
+    cumulative = 0.0
+    for row in workout_rows:
+        distance_m = float(row["total_distance_m"] or 0)
+        start_m, end_m = cumulative, cumulative + distance_m
+        split_type = str(row["split_type"] or "")
+        # rwd_run/rwd_walk are whole-activity records duplicated alongside
+        # the structured interval records; they must not shift segment ranges.
+        if split_type.startswith("rwd_"):
+            continue
+        if split_type == "interval_active" and distance_m >= 1000:
+            active_blocks.append((start_m, end_m))
+        elif split_type == "interval_active" and distance_m > 0:
+            short_active_blocks.append((start_m, end_m))
+        cumulative = end_m
+
+    def rows_in_ranges(ranges):
+        selected = []
+        km_cumulative = 0.0
+        for row in km_rows:
+            distance_m = float(row["split_distance_m"] or 0)
+            midpoint = km_cumulative + distance_m / 2
+            if any(start <= midpoint < end for start, end in ranges):
+                selected.append(row)
+            km_cumulative += distance_m
+        return selected
+
+    primary_rows = rows_in_ranges(active_blocks)
+    stride_rows = rows_in_ranges(short_active_blocks)
+    whole = _weighted_segment_metric(km_rows)
+    result = {"whole_activity": {"status": "ready", "metrics": whole, "evidence": "整堂活動"} if whole else {"status": "not_assessable", "reason": "activity_metrics_missing"}}
+    if primary_rows:
+        primary_metrics = _weighted_segment_metric(primary_rows)
+        primary_payload = {"status": "ready", "metrics": primary_metrics, "evidence": f"{len(active_blocks)} 個長 active 主段；排除 WU、Recovery、CD"}
+        primary_distance = sum(float(row["split_distance_m"] or 0) for row in primary_rows)
+        if len(primary_rows) >= 2 and primary_distance > 0:
+            halfway = primary_distance / 2
+            first_rows, second_rows, running = [], [], 0.0
+            for row in primary_rows:
+                target = first_rows if running < halfway else second_rows
+                target.append(row)
+                running += float(row["split_distance_m"] or 0)
+            first_metrics = _weighted_segment_metric(first_rows)
+            second_metrics = _weighted_segment_metric(second_rows)
+            if first_metrics and second_metrics:
+                primary_payload["first_half"] = {"status": "ready", "metrics": first_metrics}
+                primary_payload["second_half"] = {"status": "ready", "metrics": second_metrics}
+        result["primary_work"] = primary_payload
+    if stride_rows:
+        stride_payload = {"status": "ready", "metrics": _weighted_segment_metric(stride_rows), "evidence": f"{len(short_active_blocks)} 個短 active 段；獨立於有氧主體"}
+        reps = []
+        for index, block in enumerate(short_active_blocks, start=1):
+            rep_rows = rows_in_ranges([block])
+            rep_metrics = _weighted_segment_metric(rep_rows)
+            if rep_metrics:
+                reps.append({"rep_index": index, "status": "ready", "metrics": rep_metrics})
+        if reps:
+            stride_payload["reps"] = reps
+        result["strides"] = stride_payload
+    return result
+
+
+def comparison_handoff_text(rows, scope="activity", comparison_context=None, similarity_result=None):
+    if not rows:
+        return ""
+    scope_labels = {"activity": "活動", "week": "週", "month": "月"}
+    scope_label = scope_labels.get(scope, "活動")
+    lines = [
+        "請分析以下 CoachOS 活動比較資料。請比較配速、心率、功率、步態與訓練負荷，指出差異、異常值、可能原因，以及對後續訓練的具體建議。不要只重述表格，請以教練角度給出結論。",
+        "",
+        f"比較範圍：{scope_label}",
+        "| 日期 | 活動 | 距離 km | 時間 | 配速 | 平均心率 | 最大心率 | 功率 W | 訓練負荷 | 步頻 | 步幅 mm | GCT ms |",
+        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    if comparison_context:
+        rules = comparison_context.get("similarity_rules", {})
+        lines.extend([
+            "",
+            "## 相近活動查詢條件",
+            "- 比較方式：同類活動的歷史比較",
+            f"- 基準活動：第 {comparison_context.get('anchor_activity_id', '—')} 筆活動",
+            f"- 規則版本：相近活動第 2 版（{comparison_context.get('rule_version', '—')}）",
+            f"- 比對條件：課表類型相同；訓練目的相同；距離 ±{rules.get('distance_tolerance_pct', '—')}%；最近 {rules.get('lookback_weeks', '—')} 週；課表分段僅供參考",
+            "- 以下活動集合由 CoachOS 依固定規則產生；請不要自行重新挑選活動。",
+        ])
+        evidence_map = {item["activity_id"]: item for item in (similarity_result or {}).get("included", [])}
+        if evidence_map:
+            lines.extend(["", "## 相近活動比對依據"])
+            for row in rows:
+                item = evidence_map.get(row["activity_id"])
+                if item:
+                    rule_labels = {
+                        "lookback_weeks": "時間範圍符合",
+                        "workout_type_code": "課表類型相同",
+                        "primary_purpose_code": "訓練目的相同",
+                        "distance_tolerance_pct": "距離在允許範圍內",
+                        "segment_structure": "課表結構（補充資訊）",
+                    }
+                    passed = "; ".join(rule_labels.get(entry["rule"], entry["rule"]) for entry in item["evidence"] if entry["status"] == "pass")
+                    lines.append(f"- 活動：{row['activity_name'] or row['activity_type'] or '未命名活動'}（{format_short_datetime(row['activity_start_time'])}）：{passed}")
+        baseline = (similarity_result or {}).get("baseline") or {}
+        if baseline.get("status") == "ready":
+            lines.extend(["", "## CoachOS 計算的近期典型範圍", "以下範圍只代表這組相近活動，不代表永久能力值；不同指標可能來自不同資料層級，AI 請直接解讀，不要重新計算 baseline。"])
+            baseline_labels = {field: label for field, label, _format_key in CONDITIONAL_BASELINE_METRICS}
+            for field, metric in baseline.get("metrics", {}).items():
+                if metric.get("status") == "ready":
+                    scope_label = {"whole_activity": "整堂活動", "primary_work": "品質主段", "strides": "Strides"}.get(metric.get("metric_scope"), metric.get("metric_scope", "未標示"))
+                    lines.append(f"- {baseline_labels.get(field, field)}（{scope_label}）：P25 {metric['p25']:.2f}；中位數 {metric['median']:.2f}；P75 {metric['p75']:.2f}（資料 {metric['available_count']}/{metric['sample_count']}）")
+            stride_baseline = (baseline.get("scope_baselines") or {}).get("strides") or {}
+            if stride_baseline.get("status") == "ready":
+                lines.append("- Strides 是獨立的次要刺激層，請勿與 Easy／Tempo 主段混合解讀：")
+                for field, metric in stride_baseline.get("metrics", {}).items():
+                    if metric.get("status") == "ready":
+                        lines.append(f"  - {baseline_labels.get(field, field)}（Strides）：P25 {metric['p25']:.2f}；中位數 {metric['median']:.2f}；P75 {metric['p75']:.2f}（資料 {metric['available_count']}/{metric['sample_count']}）")
+        anomalies = (similarity_result or {}).get("anomalies") or {}
+        if anomalies:
+            lines.extend(["", "## CoachOS 平台資料提醒", "以下是固定規則發現的資料限制或表現偏離；`not_assessable` 不代表正常或異常，請由 AI 解釋可能原因，不要改寫原始資料。"])
+            flagged_scopes = anomalies.get("summary", {}).get("performance_flagged_scope") or []
+            scope_text = "、".join({"primary_work": "品質主段", "strides": "Strides", "whole_activity": "整堂活動"}.get(scope_name, scope_name) for scope_name in flagged_scopes) or "—"
+            lines.append(f"- 資料：{anomalies.get('summary', {}).get('data', 'not_assessable')}；情境：{anomalies.get('summary', {}).get('context', 'not_assessable')}；表現：{anomalies.get('summary', {}).get('performance', 'not_assessable')}；表現偏離層級：{scope_text}")
+            flagged_evidence = []
+            for activity in anomalies.get("activities", []):
+                for item in activity.get("evidence", []):
+                    if item.get("status") == "flagged":
+                        scope_label = item.get("scope_label") or item.get("metric_scope") or "未標示層級"
+                        flagged_evidence.append(f"活動 {item.get('activity_id')}｜{item.get('metric')}｜{scope_label}｜觀測值 {item.get('observed_value')}｜原因：{item.get('reason')}")
+            if flagged_evidence:
+                lines.append("- 指標級 evidence（不得把不同 scope 混合解讀）：")
+                lines.extend(f"  {entry}" for entry in flagged_evidence)
+            behavior_lines = []
+            for activity in anomalies.get("activities", []):
+                behavior = activity.get("behavior") or {}
+                primary_behavior = behavior.get("primary_work") or {}
+                if primary_behavior.get("status") == "ready":
+                    behavior_lines.append(f"- 活動 {activity.get('activity_id')}｜主段前後半 pattern={primary_behavior.get('execution_pattern')}：功率差 {primary_behavior.get('power_delta_w'):.1f}W、HR 差 {primary_behavior.get('hr_delta_bpm'):.1f} bpm、配速差 {primary_behavior.get('pace_delta_sec_per_km'):.1f} sec/km｜{primary_behavior.get('interpretation')}")
+                stride_behavior = behavior.get("strides") or {}
+                if stride_behavior.get("status") == "ready":
+                    behavior_lines.append(f"- 活動 {activity.get('activity_id')}｜Strides 角色 {stride_behavior.get('intent')}（來源：{stride_behavior.get('intent_source')}、信心：{stride_behavior.get('intent_confidence')}、符合度：{stride_behavior.get('role_fit')}）｜rep_consistency={stride_behavior.get('rep_consistency')}、{stride_behavior.get('rep_count')} 組：配速範圍 {float(stride_behavior.get('pace_range_sec_per_km') or 0):.1f} sec/km、功率範圍 {float(stride_behavior.get('power_range_w') or 0):.1f}W、GCT 範圍 {float(stride_behavior.get('gct_range_ms') or 0):.1f}ms｜{stride_behavior.get('interpretation')}")
+            if behavior_lines:
+                lines.extend(["", "## CoachOS 訓練行為 evidence", "前後半與逐組資料只描述執行模式，不直接推論 fitness、心率漂移或訓練對錯。", *behavior_lines])
+            longitudinal = anomalies.get("longitudinal_behavior_summary") or {}
+            if longitudinal.get("status") == "ready":
+                lines.extend([
+                    "",
+                    "## 近期行為重複摘要",
+                    f"最近 {longitudinal.get('sample_count')} 堂：主段 execution pattern 計數 {longitudinal.get('primary_execution_pattern_counts') or {}}；Strides rep consistency 計數 {longitudinal.get('strides_rep_consistency_counts') or {}}；Strides role fit {longitudinal.get('strides_role_fit_counts') or {}}；late_acceleration {longitudinal.get('late_acceleration_count', 0)} 次。",
+                    "這是行為出現次數，不是能力分數、效率分數或趨勢判定。",
+                ])
+    for row in rows:
+        lines.append(
+            "| {date} | {name} | {distance} | {duration} | {pace} | {hr} | {max_hr} | {power} | {load} | {cadence} | {stride} | {gct} |".format(
+                date=format_short_datetime(row["activity_start_time"]),
+                name=(row["activity_name"] or row["activity_type"] or "未命名活動"),
+                distance=format_number(row["distance_km"], 2),
+                duration=format_duration_hms(row["duration_sec"]),
+                pace=format_pace_seconds(row["avg_pace_sec_per_km"]),
+                hr=format_number(row["avg_hr"], 0),
+                max_hr=format_number(row["max_hr"], 0),
+                power=format_number(row["avg_power_w"], 0),
+                load=format_number(row["training_load"], 0),
+                cadence=format_number(row["avg_cadence_spm"], 1),
+                stride=format_number(row["avg_stride_length_mm"], 0),
+                gct=format_number(row["avg_gct_ms"], 0),
+            )
+        )
+    primary_segment_rows = []
+    primary_half_rows = []
+    stride_segment_rows = []
+    stride_rep_rows = []
+    for row in rows:
+        segment_metrics = row.get("segment_metrics", {}) if isinstance(row, dict) else {}
+        for scope_name, target in (("primary_work", primary_segment_rows), ("strides", stride_segment_rows)):
+            segment = segment_metrics.get(scope_name)
+            if segment and segment.get("status") == "ready":
+                metrics = segment["metrics"]
+                target.append(
+                    "| {date} | {name} | {distance} | {pace} | {hr} | {power} | {cadence} | {stride} | {gct} |".format(
+                        date=format_short_datetime(row["activity_start_time"]),
+                        name=row["activity_name"] or row["activity_type"] or "未命名活動",
+                        distance=f"{format_number(metrics['distance_km'], 2)} km",
+                        pace=format_pace_seconds(metrics["avg_pace_sec_per_km"]),
+                        hr=format_number(metrics["avg_hr"], 0),
+                        power=format_number(metrics["avg_power_w"], 0),
+                        cadence=format_number(metrics["avg_cadence_spm"], 1),
+                        stride=format_number(metrics["avg_stride_length_mm"], 0),
+                        gct=format_number(metrics["avg_gct_ms"], 0),
+                    )
+                )
+                if scope_name == "primary_work":
+                    first = segment.get("first_half") or {}
+                    second = segment.get("second_half") or {}
+                    if first.get("status") == "ready" and second.get("status") == "ready":
+                        first_metrics, second_metrics = first["metrics"], second["metrics"]
+                        primary_half_rows.append(
+                            "| {date} | {name} | {first_pace} | {second_pace} | {first_hr} | {second_hr} | {first_power} | {second_power} | {first_gct} | {second_gct} |".format(
+                                date=format_short_datetime(row["activity_start_time"]),
+                                name=row["activity_name"] or row["activity_type"] or "未命名活動",
+                                first_pace=format_pace_seconds(first_metrics["avg_pace_sec_per_km"]),
+                                second_pace=format_pace_seconds(second_metrics["avg_pace_sec_per_km"]),
+                                first_hr=format_number(first_metrics["avg_hr"], 0),
+                                second_hr=format_number(second_metrics["avg_hr"], 0),
+                                first_power=format_number(first_metrics["avg_power_w"], 0),
+                                second_power=format_number(second_metrics["avg_power_w"], 0),
+                                first_gct=format_number(first_metrics["avg_gct_ms"], 0),
+                                second_gct=format_number(second_metrics["avg_gct_ms"], 0),
+                            )
+                        )
+                elif scope_name == "strides":
+                    for rep in segment.get("reps", []):
+                        if rep.get("status") != "ready":
+                            continue
+                        rep_metrics = rep["metrics"]
+                        stride_rep_rows.append(
+                            "| {date} | {name} | {rep} | {pace} | {hr} | {power} | {gct} |".format(
+                                date=format_short_datetime(row["activity_start_time"]),
+                                name=row["activity_name"] or row["activity_type"] or "未命名活動",
+                                rep=rep["rep_index"],
+                                pace=format_pace_seconds(rep_metrics["avg_pace_sec_per_km"]),
+                                hr=format_number(rep_metrics["avg_hr"], 0),
+                                power=format_number(rep_metrics["avg_power_w"], 0),
+                                gct=format_number(rep_metrics["avg_gct_ms"], 0),
+                            )
+                        )
+    if primary_segment_rows:
+        lines.extend(["", "## 品質主段比較（primary_work）", "以下數據已排除 WU、Recovery 與 CD；請優先用來判讀主要訓練輸出。", "| 日期 | 活動 | 主段距離 | 主段配速 | 平均心率 | 功率 | 步頻 | 步幅 | GCT |", "|---|---|---:|---:|---:|---:|---:|---:|---:|", *primary_segment_rows])
+    if primary_half_rows:
+        lines.extend(["", "## 品質主段前半／後半比較", "用於觀察主段後半是否出現心率上升、功率下降或 GCT 拉長；不是另一個 baseline。", "| 日期 | 活動 | 前半配速 | 後半配速 | 前半 HR | 後半 HR | 前半功率 | 後半功率 | 前半 GCT | 後半 GCT |", "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|", *primary_half_rows])
+    if stride_segment_rows:
+        lines.extend(["", "## Strides 段比較", "以下短加速段獨立列出，不與 Easy 有氧主體平均。", "| 日期 | 活動 | Strides 距離 | 配速 | 平均心率 | 功率 | 步頻 | 步幅 | GCT |", "|---|---|---:|---:|---:|---:|---:|---:|---:|", *stride_segment_rows])
+    if stride_rep_rows:
+        lines.extend(["", "## Strides 逐組比較", "若資料可辨識每一組 Stride，分組列出以觀察組間失速或動作變化。", "| 日期 | 活動 | 組別 | 配速 | 平均心率 | 功率 | GCT |", "|---|---|---:|---:|---:|---:|---:|", *stride_rep_rows])
+    lines.extend(
+        [
+            "",
+            "請使用以下格式回答：",
+            "1. 核心結論",
+            "2. 重要差異與可能原因",
+            "3. 數據中的異常或需要補充的資訊",
+            "4. 下一步訓練建議",
+            "",
+            "如果要產生比較圖，請以日期為 X 軸，至少呈現距離、配速、平均心率與訓練負荷，並在圖例中標示活動名稱。",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def comparison_image_prompt(rows, scope="activity", comparison_context=None, similarity_result=None):
+    if not rows:
+        return ""
+    names = ", ".join(str(row["activity_name"] or row["activity_type"] or "未命名活動") for row in rows)
+    scope_label = {"activity": "活動", "week": "週", "month": "月"}.get(scope, "活動")
+    return (
+        "請根據以下 CoachOS 活動比較表產生一張清楚、適合跑者閱讀的數據圖。\n"
+        "使用淺色背景、繁體中文標籤，包含四個面板：距離、配速、平均心率、訓練負荷；"
+        "以日期為 X 軸，活動名稱作為圖例，數值單位要清楚，避免捏造表格以外的數據。\n\n"
+        f"比較範圍：{scope_label}\n活動：{names}\n\n"
+        f"{comparison_handoff_text(rows, scope, comparison_context, similarity_result)}"
+    )
+
+
+SIMILAR_ACTIVITIES_RULE_VERSION = "similar-activities-v2"
+CONDITIONAL_BASELINE_RULE_VERSION = "conditional-baseline-v1"
+
+CONDITIONAL_BASELINE_METRICS = (
+    ("avg_pace_sec_per_km", "配速", "pace"),
+    ("avg_hr", "平均心率", "heart_rate"),
+    ("avg_power_w", "平均功率", "power"),
+    ("training_load", "訓練負荷", "load"),
+    ("avg_cadence_spm", "平均步頻", "cadence"),
+    ("avg_stride_length_mm", "平均步幅", "stride"),
+    ("avg_gct_ms", "平均觸地時間", "gct"),
+)
+
+# Baseline scope is metric-specific.  A structured workout can share one
+# aerobic primary-work baseline while its total load still belongs to the
+# whole activity, and Easy + Strides needs a separate secondary-work view.
+CONDITIONAL_BASELINE_METRIC_SCOPES = {
+    "avg_pace_sec_per_km": "primary_work",
+    "avg_hr": "primary_work",
+    "avg_power_w": "primary_work",
+    "training_load": "whole_activity",
+    "avg_cadence_spm": "primary_work",
+    "avg_stride_length_mm": "primary_work",
+    "avg_gct_ms": "primary_work",
+}
+
+
+def _similar_rule(status, detail):
+    return {"status": status, "detail": detail}
+
+
+def build_comparison_context(connection, anchor_activity_id, comparison_intent="longitudinal"):
+    anchor = connection.execute(
+        "SELECT * FROM activity_review_view WHERE activity_id = ?",
+        (int(anchor_activity_id),),
+    ).fetchone()
+    if not anchor:
+        return {"status": "anchor_not_found", "anchor_activity_id": int(anchor_activity_id)}
+    if comparison_intent != "longitudinal":
+        return {"status": "unsupported_intent", "comparison_intent": comparison_intent}
+    required = {
+        "workout_type_code": anchor["workout_type_code"],
+        "primary_purpose_code": anchor["primary_training_purpose_code"],
+        "distance_km": anchor["distance_km"],
+    }
+    missing = [name for name, value in required.items() if value in (None, "")]
+    context = {
+        "status": "ok" if not missing else "insufficient_anchor_context",
+        "comparison_intent": comparison_intent,
+        "comparison_scope": "activity",
+        "anchor_activity_id": int(anchor_activity_id),
+        "anchor_snapshot": {
+            "activity_start_time": anchor["activity_start_time"],
+            "workout_type_code": anchor["workout_type_code"],
+            "primary_purpose_code": anchor["primary_training_purpose_code"],
+            "distance_km": anchor["distance_km"],
+        },
+        "data_snapshot_reference": "sqlite:running_analytics.sqlite",
+        "similarity_rules": {
+            "workout_type_code": anchor["workout_type_code"],
+            "primary_purpose_code": anchor["primary_training_purpose_code"],
+            "distance_tolerance_pct": 15,
+            "segment_structure": "compatible",
+            "lookback_weeks": 12,
+            "include_anchor": True,
+        },
+        "rule_version": SIMILAR_ACTIVITIES_RULE_VERSION,
+        "result_limit": 12,
+    }
+    if missing:
+        context["missing_required_fields"] = missing
+    return context
+
+
+def _similar_structure_evidence(connection, activity_id):
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(activity_workout_step)").fetchall()}
+    if not columns:
+        return _similar_rule("not_evaluable", "activity_workout_step is unavailable")
+    rows = connection.execute(
+        "SELECT step_index, repeat_steps FROM activity_workout_step WHERE activity_id = ? ORDER BY step_index",
+        (activity_id,),
+    ).fetchall()
+    if not rows:
+        return _similar_rule("pass", "no structured workout steps; treated as continuous")
+    if len(rows) == 1 and (rows[0]["repeat_steps"] in (None, 0, 1)):
+        return _similar_rule("pass", "one non-repeating workout step; treated as continuous")
+    return _similar_rule("pass", f"structured workout has {len(rows)} steps; structure retained as context")
+
+
+def find_similar_activities(connection, context):
+    if context.get("status") != "ok":
+        return {"status": context.get("status", "invalid_context"), "context": context, "included": [], "excluded": []}
+    anchor_id = context["anchor_activity_id"]
+    rules = context["similarity_rules"]
+    anchor = connection.execute(
+        "SELECT * FROM activity_review_view WHERE activity_id = ?",
+        (anchor_id,),
+    ).fetchone()
+    lower = float(rules["distance_tolerance_pct"] and anchor["distance_km"] * (1 - rules["distance_tolerance_pct"] / 100))
+    upper = float(anchor["distance_km"] * (1 + rules["distance_tolerance_pct"] / 100))
+    start = datetime.fromisoformat(str(anchor["activity_start_time"]).replace("Z", "+00:00"))
+    window_start = (start - timedelta(weeks=rules["lookback_weeks"])).isoformat(timespec="seconds")
+    candidates = connection.execute(
+        """
+        SELECT * FROM activity_review_view
+        WHERE activity_start_time <= ?
+        ORDER BY activity_start_time DESC, activity_id DESC
+        """,
+        (anchor["activity_start_time"],),
+    ).fetchall()
+    included = []
+    excluded = []
+    for row in candidates:
+        evidence = []
+        in_window = str(row["activity_start_time"]) >= window_start
+        evidence.append({"rule": "lookback_weeks", **_similar_rule("pass" if in_window else "fail", "within 12 weeks" if in_window else "outside 12 weeks")})
+        type_pass = row["workout_type_code"] == rules["workout_type_code"]
+        evidence.append({"rule": "workout_type_code", **_similar_rule("pass" if type_pass else "fail", str(row["workout_type_code"] or "missing"))})
+        purpose_pass = row["primary_training_purpose_code"] == rules["primary_purpose_code"]
+        evidence.append({"rule": "primary_purpose_code", **_similar_rule("pass" if purpose_pass else "fail", str(row["primary_training_purpose_code"] or "missing"))})
+        distance = row["distance_km"]
+        distance_pass = distance is not None and lower <= float(distance) <= upper
+        distance_detail = "missing" if distance is None else f"{float(distance):.2f} km; allowed {lower:.2f}-{upper:.2f} km"
+        evidence.append({"rule": "distance_tolerance_pct", **_similar_rule("pass" if distance_pass else ("not_evaluable" if distance is None else "fail"), distance_detail)})
+        structure = _similar_structure_evidence(connection, row["activity_id"])
+        evidence.append({"rule": "segment_structure", **structure})
+        # Workout structure is evidence for interpretation, not a hard exclusion
+        # for longitudinal comparisons. A multi-step workout can still be the
+        # same recurring session (for example, Eazy + Strides or LSD).
+        passed = in_window and type_pass and purpose_pass and distance_pass
+        item = {"activity_id": row["activity_id"], "match_status": "included" if passed else "excluded", "evidence": evidence}
+        (included if passed else excluded).append(item)
+    if not any(item["activity_id"] == anchor_id for item in included) and rules.get("include_anchor"):
+        anchor_item = next((item for item in excluded if item["activity_id"] == anchor_id), None)
+        if anchor_item:
+            anchor_item["match_status"] = "included"
+            included.append(anchor_item)
+            excluded.remove(anchor_item)
+    included.sort(key=lambda item: (str(next(row["activity_start_time"] for row in candidates if row["activity_id"] == item["activity_id"])), item["activity_id"]), reverse=True)
+    limit = int(context.get("result_limit") or 12)
+    result = {
+        "status": "ok",
+        "context": context,
+        "anchor": {"activity_id": anchor_id, "activity_start_time": anchor["activity_start_time"], "display_name": anchor["activity_name"] or anchor["activity_type"] or "活動"},
+        "included": included[:limit],
+        "excluded": excluded,
+        "activity_snapshots": [
+            {
+                **{
+                    field: row[field]
+                    for field in ("activity_id", "activity_start_time", "activity_name", "distance_km", "workout_type_code", "primary_training_purpose_code") + tuple(metric[0] for metric in CONDITIONAL_BASELINE_METRICS)
+                    if field in row.keys()
+                },
+                "segment_metrics": activity_segment_metrics(connection, row["activity_id"]),
+                "segment_intent": infer_segment_intent(row),
+            }
+            for row in candidates
+            if any(item["activity_id"] == row["activity_id"] for item in included[:limit])
+        ],
+        "truncation": {"candidate_count": len(candidates), "included_before_limit": len(included), "result_limit": limit, "truncated": len(included) > limit},
+    }
+    return result
+
+
+def _linear_percentile(values, percentile):
+    ordered = sorted(float(value) for value in values)
+    if not ordered:
+        return None
+    position = (len(ordered) - 1) * percentile
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
+
+
+def calculate_conditional_baseline(connection, comparison_result):
+    """Calculate a robust baseline from the Phase 1 included set only."""
+    if not comparison_result or comparison_result.get("status") != "ok":
+        return {"status": "not_available", "baseline_rule_version": CONDITIONAL_BASELINE_RULE_VERSION}
+    included_ids = [
+        int(item["activity_id"])
+        for item in comparison_result.get("included", [])
+        if str(item.get("match_status", "included")) == "included"
+    ]
+    context = comparison_result.get("context") or {}
+    base = {
+        "baseline_rule_version": CONDITIONAL_BASELINE_RULE_VERSION,
+        "comparison_set_size": len(included_ids),
+        "context_reference": {
+            "comparison_intent": context.get("comparison_intent"),
+            "anchor_activity_id": context.get("anchor_activity_id"),
+            "rule_version": context.get("rule_version"),
+            "baseline_rule_version": CONDITIONAL_BASELINE_RULE_VERSION,
+        },
+    }
+    if not included_ids:
+        return {"status": "not_available", **base}
+    placeholders = ",".join("?" for _ in included_ids)
+    rows = connection.execute(
+        f"SELECT * FROM activity_review_view WHERE activity_id IN ({placeholders}) ORDER BY activity_start_time ASC, activity_id ASC",
+        included_ids,
+    ).fetchall()
+    if len(included_ids) < 3:
+        status = "insufficient_baseline"
+    else:
+        status = "ready"
+    timestamps = [str(row["activity_start_time"]) for row in rows if row["activity_start_time"]]
+    base.update(
+        {
+            "status": status,
+            "baseline_window": {"start": min(timestamps) if timestamps else None, "end": max(timestamps) if timestamps else None},
+            "metrics": {},
+        }
+    )
+    sample_count = len(included_ids)
+    snapshots_by_id = {int(snapshot["activity_id"]): snapshot for snapshot in comparison_result.get("activity_snapshots", []) if snapshot.get("activity_id") is not None}
+    base["metric_scope"] = "mixed"
+    base["metric_scopes"] = dict(CONDITIONAL_BASELINE_METRIC_SCOPES)
+    for field, _label, _format_key in CONDITIONAL_BASELINE_METRICS:
+        requested_scope = CONDITIONAL_BASELINE_METRIC_SCOPES[field]
+        values = []
+        def scope_for_snapshot(snapshot, scope):
+            segments = snapshot.get("segment_metrics", {})
+            selected = segments.get(scope)
+            if selected and selected.get("status") == "ready":
+                return selected
+            # A continuous activity has no separate primary_work row. In
+            # that explicit case, whole_activity is the primary work rather
+            # than an unlabelled fallback. Structured WU/CD-only activities
+            # remain not_assessable.
+            if scope == "primary_work" and "primary_work" not in segments and "strides" not in segments:
+                whole = segments.get("whole_activity") or {}
+                if whole.get("status") == "ready":
+                    return whole
+                # Legacy/continuous fixtures may not have segment tables at
+                # all. The row-level activity metrics are then the only
+                # explicit whole-activity evidence available.
+                return {"status": "ready", "metrics": snapshot}
+            return None
+
+        scope_available = requested_scope == "whole_activity" or (
+            bool(snapshots_by_id)
+            and all(scope_for_snapshot(snapshots_by_id.get(activity_id, {}), requested_scope) is not None for activity_id in included_ids)
+        )
+        for row in rows:
+            snapshot = snapshots_by_id.get(int(row["activity_id"]), {})
+            scoped = (scope_for_snapshot(snapshot, requested_scope) or {}).get("metrics", {})
+            # Never mix primary-work and whole-activity values inside one
+            # metric. If the requested segment scope is unavailable, the
+            # metric is explicitly not assessable instead of silently falling
+            # back to an aggregate value.
+            value = scoped.get(field) if scope_available and scoped else (row[field] if requested_scope == "whole_activity" and field in row.keys() else None)
+            if value is not None:
+                values.append(value)
+        available_count = len(values)
+        metric = {
+            "metric_scope": requested_scope,
+            "available_count": available_count,
+            "sample_count": sample_count,
+            "data_completeness": available_count / sample_count if sample_count else 0.0,
+        }
+        if requested_scope != "whole_activity" and not scope_available:
+            metric.update({"status": "not_assessable", "scope_reason": "primary_work_not_available_for_all_activities"})
+            base["metrics"][field] = metric
+            continue
+        if available_count == 0:
+            metric["status"] = "not_available"
+        elif available_count < 3:
+            metric["status"] = "insufficient_data"
+        elif status != "ready":
+            metric["status"] = "insufficient_data"
+        else:
+            metric.update(
+                {
+                    "status": "ready",
+                    "median": _linear_percentile(values, 0.50),
+                    "p25": _linear_percentile(values, 0.25),
+                    "p75": _linear_percentile(values, 0.75),
+                }
+            )
+        base["metrics"][field] = metric
+
+    # Strides are a secondary stimulus layer, not a replacement for the
+    # primary-work baseline. Keep them as an independent optional baseline so
+    # Easy + Strides can be interpreted without contaminating Easy metrics.
+    stride_values = {field: [] for field, _label, _format_key in CONDITIONAL_BASELINE_METRICS if field != "training_load"}
+    for activity_id in included_ids:
+        metrics = (snapshots_by_id.get(activity_id, {}).get("segment_metrics", {}).get("strides") or {}).get("metrics", {})
+        for field in stride_values:
+            if metrics.get(field) is not None:
+                stride_values[field].append(metrics[field])
+    stride_sample_count = max((len(values) for values in stride_values.values()), default=0)
+    base["scope_baselines"] = {"strides": {"status": "not_assessable", "metric_scope": "strides", "metrics": {}, "sample_count": stride_sample_count}}
+    if stride_sample_count >= 3:
+        stride_baseline = {"status": "ready", "metric_scope": "strides", "metrics": {}, "sample_count": stride_sample_count}
+        for field, _label, _format_key in CONDITIONAL_BASELINE_METRICS:
+            if field == "training_load":
+                continue
+            values = stride_values[field]
+            metric = {"metric_scope": "strides", "available_count": len(values), "sample_count": stride_sample_count, "data_completeness": len(values) / stride_sample_count if stride_sample_count else 0.0}
+            if len(values) >= 3:
+                metric.update({"status": "ready", "median": _linear_percentile(values, 0.50), "p25": _linear_percentile(values, 0.25), "p75": _linear_percentile(values, 0.75)})
+            else:
+                metric["status"] = "insufficient_data"
+            stride_baseline["metrics"][field] = metric
+        base["scope_baselines"]["strides"] = stride_baseline
+    return base
+
+
+ANOMALY_DETECTION_RULE_VERSION = "anomaly-detection-v1"
+
+# Statistical fences are useful for discovery, but a coach-facing anomaly
+# should also clear a practical-significance floor. Values below are in the
+# native metric units and intentionally conservative for running data.
+ANOMALY_PRACTICAL_MIN_DEVIATION = {
+    "avg_pace_sec_per_km": 2.0,
+    "avg_hr": 2.0,
+    "avg_power_w": 5.0,
+    "training_load": 10.0,
+    "avg_cadence_spm": 1.0,
+    "avg_stride_length_mm": 10.0,
+    "avg_gct_ms": 3.0,
+}
+
+
+def _scoped_metric_value(snapshot, field, metric_scope):
+    """Resolve one metric without silently mixing stimulus layers."""
+    segments = snapshot.get("segment_metrics", {}) if isinstance(snapshot, dict) else {}
+    segment = segments.get(metric_scope) or {}
+    if segment.get("status") == "ready":
+        value = segment.get("metrics", {}).get(field)
+        if value is not None:
+            return value, True
+        # Some segment payloads intentionally do not contain whole-activity
+        # fields such as training_load. Those fields remain sourced from the
+        # activity snapshot, while the segment scope stays explicit.
+        if metric_scope == "whole_activity":
+            return snapshot.get(field), snapshot.get(field) is not None
+        return None, False
+    if metric_scope == "primary_work" and "primary_work" not in segments and "strides" not in segments:
+        whole = segments.get("whole_activity") or {}
+        if whole.get("status") == "ready":
+            return whole.get("metrics", {}).get(field), True
+        return snapshot.get(field), snapshot.get(field) is not None
+    if metric_scope == "whole_activity":
+        return snapshot.get(field), snapshot.get(field) is not None
+    return None, False
+
+
+def _segment_unavailability(snapshot, metric_scope):
+    segments = snapshot.get("segment_metrics", {}) if isinstance(snapshot, dict) else {}
+    if metric_scope == "strides" and "strides" not in segments:
+        return "segment_not_present", "這堂活動沒有 Strides 段落，不屬於資料遺失"
+    if metric_scope == "primary_work" and "primary_work" not in segments and ("strides" in segments or "whole_activity" in segments):
+        return "primary_work_not_identifiable", "有課表分段，但無法可靠辨識品質主段"
+    return "segment_present_but_missing_data", "已有指定段落，但段落指標資料不完整"
+
+
+def _segment_behavior_evidence(snapshot):
+    """Describe within-activity execution without inferring cause."""
+    segments = snapshot.get("segment_metrics", {}) if isinstance(snapshot, dict) else {}
+    behavior = {"primary_work": {}, "strides": {}}
+    primary = segments.get("primary_work") or {}
+    first, second = primary.get("first_half") or {}, primary.get("second_half") or {}
+    if first.get("status") == "ready" and second.get("status") == "ready":
+        first_metrics, second_metrics = first["metrics"], second["metrics"]
+        power_delta = float(second_metrics.get("avg_power_w") or 0) - float(first_metrics.get("avg_power_w") or 0)
+        hr_delta = float(second_metrics.get("avg_hr") or 0) - float(first_metrics.get("avg_hr") or 0)
+        pace_delta = float(second_metrics.get("avg_pace_sec_per_km") or 0) - float(first_metrics.get("avg_pace_sec_per_km") or 0)
+        gct_delta = float(second_metrics.get("avg_gct_ms") or 0) - float(first_metrics.get("avg_gct_ms") or 0)
+        same_power_band = abs(power_delta) <= 5.0
+        if same_power_band and pace_delta < -2 and hr_delta > 2:
+            execution_pattern = "stable_power_faster_second_half"
+        elif same_power_band and hr_delta > 2:
+            execution_pattern = "stable_power_higher_hr_second_half"
+        elif same_power_band and pace_delta < -2:
+            execution_pattern = "stable_power_faster_second_half"
+        elif power_delta > 5 and pace_delta < -2:
+            execution_pattern = "higher_power_faster_second_half"
+        else:
+            execution_pattern = "no_clear_second_half_change"
+        behavior["primary_work"] = {
+            "status": "ready",
+            "comparison": "same_power_band" if same_power_band else "power_changed",
+            "execution_pattern": execution_pattern,
+            "power_delta_w": power_delta,
+            "hr_delta_bpm": hr_delta,
+            "pace_delta_sec_per_km": pace_delta,
+            "gct_delta_ms": gct_delta,
+            "interpretation": "相同功率區間下的前後半變化，僅供觀察，不直接判定心率漂移" if same_power_band else "前後半功率已改變，不適合單獨判定心率漂移",
+        }
+    reps = [rep.get("metrics", {}) for rep in (segments.get("strides") or {}).get("reps", []) if rep.get("status") == "ready"]
+    if len(reps) >= 3:
+        paces = [float(rep.get("avg_pace_sec_per_km")) for rep in reps if rep.get("avg_pace_sec_per_km") is not None]
+        powers = [float(rep.get("avg_power_w")) for rep in reps if rep.get("avg_power_w") is not None]
+        gcts = [float(rep.get("avg_gct_ms")) for rep in reps if rep.get("avg_gct_ms") is not None]
+        pace_range = max(paces) - min(paces) if paces else None
+        power_range = max(powers) - min(powers) if powers else None
+        gct_range = max(gcts) - min(gcts) if gcts else None
+        last_rep_spike = False
+        if paces:
+            middle = sorted(paces)[len(paces) // 2]
+            last_rep_spike = paces[-1] <= middle - 15
+        # Strides are short accelerations, so allow a wider pace band than an
+        # aerobic interval while still catching a final-rep jump.
+        consistent = (pace_range is None or pace_range <= 20) and (power_range is None or power_range <= 35) and (gct_range is None or gct_range <= 15)
+        intent_info = (snapshot.get("segment_intent") or {}).get("strides") or {"intent": "activation", "source": "default", "confidence": "low"}
+        intent = intent_info.get("intent", "activation")
+        if intent == "activation":
+            role_fit = "review" if not consistent or last_rep_spike else "fits_role"
+        elif intent == "speed_exposure":
+            role_fit = "fits_role" if last_rep_spike or not consistent else "review"
+        else:
+            role_fit = "fits_role" if consistent and not last_rep_spike else "review"
+        if last_rep_spike:
+            rep_consistency = "late_acceleration"
+        elif consistent:
+            rep_consistency = "consistent"
+        elif len(paces) >= 3 and all(paces[index] <= paces[index - 1] + 5 for index in range(1, len(paces))):
+            rep_consistency = "progressive"
+        else:
+            rep_consistency = "variable"
+        behavior["strides"] = {
+            "status": "ready",
+            "intent": intent,
+            "intent_source": intent_info.get("source"),
+            "intent_confidence": intent_info.get("confidence"),
+            "role_fit": role_fit,
+            "rep_consistency": rep_consistency,
+            "rep_count": len(reps),
+            "pace_range_sec_per_km": pace_range,
+            "power_range_w": power_range,
+            "gct_range_ms": gct_range,
+            "execution_consistency": "consistent" if consistent else "variable",
+            "last_rep_spike": last_rep_spike,
+            "interpretation": "各組刺激接近，符合目前推導的 activation 角色" if role_fit == "fits_role" and intent == "activation" else "各組刺激接近" if role_fit == "fits_role" else "組間刺激差異較大，最後一組明顯加速" if last_rep_spike else "組間刺激差異較大；請確認 Strides 目標角色",
+        }
+    return behavior
+
+
+def _performance_direction(field, observed, p25, p75):
+    """Return coaching direction, accounting for pace's inverse scale."""
+    if field == "avg_pace_sec_per_km":
+        return "above_typical" if float(observed) < p25 else "below_typical" if float(observed) > p75 else "within_typical"
+    return "above_typical" if float(observed) > p75 else "below_typical" if float(observed) < p25 else "within_typical"
+
+
+def build_longitudinal_behavior_summary(anomaly_result, limit=6):
+    """Aggregate recent execution behavior without inventing a score."""
+    if not anomaly_result or anomaly_result.get("status") != "ready":
+        return {"status": "not_assessable", "sample_count": 0}
+    activities = list(anomaly_result.get("activities") or [])[: int(limit)]
+    primary_counts = {}
+    rep_counts = {}
+    role_fit_counts = {"fits_role": 0, "review": 0}
+    role_fit_available = 0
+    late_acceleration_count = 0
+    for activity in activities:
+        behavior = activity.get("behavior") or {}
+        primary_pattern = (behavior.get("primary_work") or {}).get("execution_pattern")
+        if primary_pattern:
+            primary_counts[primary_pattern] = primary_counts.get(primary_pattern, 0) + 1
+        strides = behavior.get("strides") or {}
+        rep_consistency = strides.get("rep_consistency")
+        if rep_consistency:
+            rep_counts[rep_consistency] = rep_counts.get(rep_consistency, 0) + 1
+        role_fit = strides.get("role_fit")
+        if role_fit in role_fit_counts:
+            role_fit_counts[role_fit] += 1
+            role_fit_available += 1
+        if rep_consistency == "late_acceleration":
+            late_acceleration_count += 1
+    return {
+        "status": "ready" if activities else "not_assessable",
+        "sample_count": len(activities),
+        "requested_limit": int(limit),
+        "primary_execution_pattern_counts": primary_counts,
+        "strides_rep_consistency_counts": rep_counts,
+        "strides_role_fit_counts": role_fit_counts,
+        "strides_role_fit_rate": role_fit_counts["fits_role"] / role_fit_available if role_fit_available else None,
+        "late_acceleration_count": late_acceleration_count,
+        "interpretation": "描述近期行為重複情況，不代表能力分數或趨勢結論",
+    }
+
+
+def detect_comparison_anomalies(comparison_result, baseline):
+    """Detect evidence from supplied comparison snapshots without querying SQLite."""
+    if not comparison_result or comparison_result.get("status") != "ok":
+        return {"status": "not_assessable", "rule_version": ANOMALY_DETECTION_RULE_VERSION, "reason": "comparison_result_unavailable", "activities": []}
+    snapshots = comparison_result.get("activity_snapshots") or []
+    if not baseline or baseline.get("status") != "ready":
+        return {
+            "status": "not_assessable",
+            "rule_version": ANOMALY_DETECTION_RULE_VERSION,
+            "comparison_set_size": len(snapshots),
+            "summary": {"data": "not_assessable", "context": "not_assessable", "performance": "not_assessable", "performance_flagged_scope": [], "behavior": "not_assessable"},
+            "activities": [],
+            "reason": "baseline_unavailable",
+        }
+    evidence_by_activity = []
+    summary = {"data": "clear", "context": "not_assessable", "performance": "clear", "performance_flagged_scope": [], "behavior": "not_assessable"}
+    metric_baselines = baseline.get("metrics", {})
+    for snapshot in snapshots:
+        activity_id = snapshot.get("activity_id")
+        evidence = []
+        data_flagged = False
+        performance_flagged = False
+        performance_not_assessable = False
+        for field, label, _format_key in CONDITIONAL_BASELINE_METRICS:
+            metric = metric_baselines.get(field, {})
+            metric_scope = metric.get("metric_scope") or CONDITIONAL_BASELINE_METRIC_SCOPES.get(field, "whole_activity")
+            observed, scope_available = _scoped_metric_value(snapshot, field, metric_scope)
+            scope_label = {"whole_activity": "整堂活動", "primary_work": "品質主段", "strides": "Strides"}.get(metric_scope, metric_scope)
+            common = {"activity_id": activity_id, "metric": field, "metric_scope": metric_scope, "scope_label": scope_label, "rule_version": ANOMALY_DETECTION_RULE_VERSION}
+            if not scope_available:
+                reason_code, reason = _segment_unavailability(snapshot, metric_scope)
+                absent = reason_code == "segment_not_present"
+                if not absent:
+                    data_flagged = True
+                evidence.append({"anomaly_type": "data", "status": "not_assessable" if absent else "flagged", **common, "observed_value": None, "expected_range": None, "deviation": None, "reason_code": reason_code, "reason": reason})
+                evidence.append({"anomaly_type": "performance", "status": "not_assessable", **common, "observed_value": None, "expected_range": None, "deviation": None, "reason_code": "scope_unavailable", "reason": f"缺少{scope_label}資料，無法判斷表現是否偏離"})
+                performance_not_assessable = True
+                continue
+            if observed is None:
+                data_flagged = True
+                evidence.append({"anomaly_type": "data", "status": "flagged", **common, "observed_value": None, "expected_range": None, "deviation": None, "reason_code": "metric_missing", "reason": f"{label}沒有資料"})
+                evidence.append({"anomaly_type": "performance", "status": "not_assessable", **common, "observed_value": None, "expected_range": None, "deviation": None, "reason_code": "metric_missing", "reason": "資料缺失，無法判斷表現是否偏離"})
+                performance_not_assessable = True
+                continue
+            evidence.append({"anomaly_type": "data", "status": "clear", **common, "observed_value": observed, "expected_range": None, "deviation": None, "reason_code": "metric_available", "reason": "資料可用"})
+            if metric.get("status") != "ready":
+                evidence.append({"anomaly_type": "performance", "status": "not_assessable", **common, "observed_value": observed, "expected_range": None, "deviation": None, "reason_code": "baseline_metric_unavailable", "reason": "近期典型範圍資料不足，無法判斷表現是否偏離"})
+                performance_not_assessable = True
+                continue
+            p25, p75 = float(metric["p25"]), float(metric["p75"])
+            iqr = p75 - p25
+            lower, upper = p25 - 1.5 * iqr, p75 + 1.5 * iqr
+            statistical_flagged = float(observed) < lower or float(observed) > upper
+            deviation = float(observed) - (p75 if float(observed) > p75 else p25 if float(observed) < p25 else metric["median"])
+            practical_threshold = ANOMALY_PRACTICAL_MIN_DEVIATION.get(field, 0.0)
+            practically_significant = statistical_flagged and abs(deviation) >= practical_threshold
+            direction = _performance_direction(field, observed, p25, p75)
+            if practically_significant:
+                performance_flagged = True
+            evidence.append({"anomaly_type": "performance", "status": "flagged" if practically_significant else "clear", **common, "observed_value": observed, "expected_range": {"lower_fence": lower, "upper_fence": upper, "p25": p25, "p75": p75}, "deviation": deviation, "direction": direction, "performance_deviation": direction, "practical_threshold": practical_threshold, "statistical_flagged": statistical_flagged, "reason_code": "outside_tukey_fence" if practically_significant else "statistical_only" if statistical_flagged else "within_tukey_fence", "reason": "超出統計範圍且達到實務偏離門檻" if practically_significant else "統計上超出範圍，但偏離幅度未達實務門檻" if statistical_flagged else "落在近期典型範圍內"})
+        # Strides are evaluated against their own secondary-work baseline.
+        stride_baseline = (baseline.get("scope_baselines") or {}).get("strides") or {}
+        stride_metrics = stride_baseline.get("metrics") or {}
+        stride_snapshot = (snapshot.get("segment_metrics", {}).get("strides") or {})
+        for field, label, _format_key in CONDITIONAL_BASELINE_METRICS:
+            if field == "training_load":
+                continue
+            metric = stride_metrics.get(field, {})
+            observed = (stride_snapshot.get("metrics") or {}).get(field) if stride_snapshot.get("status") == "ready" else None
+            common = {"activity_id": activity_id, "metric": field, "metric_scope": "strides", "scope_label": "Strides", "rule_version": ANOMALY_DETECTION_RULE_VERSION}
+            if observed is None:
+                if metric.get("status") == "ready":
+                    reason_code, reason = _segment_unavailability(snapshot, "strides")
+                    absent = reason_code == "segment_not_present"
+                    if not absent:
+                        data_flagged = True
+                    evidence.append({"anomaly_type": "data", "status": "not_assessable" if absent else "flagged", **common, "observed_value": None, "expected_range": None, "deviation": None, "reason_code": reason_code, "reason": reason})
+                    evidence.append({"anomaly_type": "performance", "status": "not_assessable", **common, "observed_value": None, "expected_range": None, "deviation": None, "reason_code": "scope_unavailable", "reason": "缺少Strides資料，無法判斷次要刺激是否偏離"})
+                    performance_not_assessable = True
+                continue
+            evidence.append({"anomaly_type": "data", "status": "clear", **common, "observed_value": observed, "expected_range": None, "deviation": None, "reason_code": "metric_available", "reason": "資料可用"})
+            if metric.get("status") != "ready":
+                continue
+            p25, p75 = float(metric["p25"]), float(metric["p75"])
+            iqr = p75 - p25
+            lower, upper = p25 - 1.5 * iqr, p75 + 1.5 * iqr
+            statistical_flagged = float(observed) < lower or float(observed) > upper
+            deviation = float(observed) - (p75 if float(observed) > p75 else p25 if float(observed) < p25 else metric["median"])
+            practical_threshold = ANOMALY_PRACTICAL_MIN_DEVIATION.get(field, 0.0)
+            practically_significant = statistical_flagged and abs(deviation) >= practical_threshold
+            direction = _performance_direction(field, observed, p25, p75)
+            if practically_significant:
+                performance_flagged = True
+            evidence.append({"anomaly_type": "performance", "status": "flagged" if practically_significant else "clear", **common, "observed_value": observed, "expected_range": {"lower_fence": lower, "upper_fence": upper, "p25": p25, "p75": p75}, "deviation": deviation, "direction": direction, "performance_deviation": direction, "practical_threshold": practical_threshold, "statistical_flagged": statistical_flagged, "reason_code": "outside_tukey_fence" if practically_significant else "statistical_only" if statistical_flagged else "within_tukey_fence", "reason": "Strides 超出統計範圍且達到實務偏離門檻" if practically_significant else "Strides 統計上超出範圍，但偏離幅度未達實務門檻" if statistical_flagged else "Strides 落在近期典型範圍內"})
+        evidence.append({"anomaly_type": "context", "status": "not_assessable", "activity_id": activity_id, "metric": None, "observed_value": None, "expected_range": None, "reason_code": "context_field_unavailable", "reason": "目前沒有可靠的天氣、路線或地形資料可供比較", "rule_version": ANOMALY_DETECTION_RULE_VERSION})
+        if data_flagged:
+            summary["data"] = "flagged"
+        if performance_flagged:
+            summary["performance"] = "flagged"
+            for item in evidence:
+                if item.get("anomaly_type") == "performance" and item.get("status") == "flagged" and item.get("metric_scope") not in summary["performance_flagged_scope"]:
+                    summary["performance_flagged_scope"].append(item["metric_scope"])
+        elif performance_not_assessable and summary["performance"] == "clear":
+            summary["performance"] = "not_assessable"
+        behavior = _segment_behavior_evidence(snapshot)
+        if behavior.get("primary_work", {}).get("status") == "ready" or behavior.get("strides", {}).get("status") == "ready":
+            summary["behavior"] = "ready"
+        evidence_by_activity.append({"activity_id": activity_id, "activity_start_time": snapshot.get("activity_start_time"), "activity_name": snapshot.get("activity_name"), "evidence": evidence, "behavior": behavior})
+    result = {"status": "ready", "rule_version": ANOMALY_DETECTION_RULE_VERSION, "comparison_set_size": len(snapshots), "summary": summary, "activities": evidence_by_activity, "context_reference": {"comparison_rule_version": (comparison_result.get("context") or {}).get("rule_version"), "baseline_rule_version": baseline.get("baseline_rule_version")}}
+    result["longitudinal_behavior_summary"] = build_longitudinal_behavior_summary(result, limit=6)
+    return result
+
+
+def conditional_baseline_panel(baseline):
+    if not baseline or baseline.get("status") == "not_available":
+        return ""
+    sample_count = baseline.get("comparison_set_size", 0)
+    if baseline.get("status") == "insufficient_baseline":
+        return f'<div class="conditional-baseline"><strong>近期典型範圍</strong><p class="note">目前只有 {sample_count} 堂相近活動，至少需要 3 堂才能建立典型範圍。</p></div>'
+    metric_by_field = baseline.get("metrics", {})
+    lines = []
+    scope_labels = {"whole_activity": "整堂", "primary_work": "主段", "strides": "Strides"}
+    for field, label, format_key in CONDITIONAL_BASELINE_METRICS:
+        metric = metric_by_field.get(field, {})
+        if metric.get("status") != "ready":
+            detail = "沒有資料" if metric.get("status") == "not_available" else f"資料不足（{metric.get('available_count', 0)}/{metric.get('sample_count', sample_count)}）"
+            lines.append(f"<li><span>{html.escape(label)}</span><strong>{html.escape(detail)}</strong></li>")
+            continue
+        if format_key == "pace":
+            value = f"{format_pace_seconds(metric['p25'])}–{format_pace_seconds(metric['p75'])}"
+            suffix = ""
+        elif format_key == "heart_rate":
+            value, suffix = format_number(metric["p25"], 0) + "–" + format_number(metric["p75"], 0), " bpm"
+        elif format_key == "power":
+            value, suffix = format_number(metric["p25"], 0) + "–" + format_number(metric["p75"], 0), " W"
+        elif format_key == "load":
+            value, suffix = format_number(metric["p25"], 0) + "–" + format_number(metric["p75"], 0), ""
+        elif format_key == "cadence":
+            value, suffix = format_number(metric["p25"], 1) + "–" + format_number(metric["p75"], 1), " spm"
+        elif format_key == "stride":
+            value, suffix = format_number(metric["p25"], 0) + "–" + format_number(metric["p75"], 0), " mm"
+        else:
+            value, suffix = format_number(metric["p25"], 0) + "–" + format_number(metric["p75"], 0), " ms"
+        scope_label = scope_labels.get(metric.get("metric_scope"), "")
+        lines.append(f"<li><span>{html.escape(label)}<small>{html.escape(scope_label)}</small></span><strong>{html.escape(value + suffix)}</strong><small>資料完整度 {metric['available_count']}/{metric['sample_count']}</small></li>")
+    window = baseline.get("baseline_window") or {}
+    stride_lines = []
+    stride_baseline = (baseline.get("scope_baselines") or {}).get("strides") or {}
+    for field, label, format_key in CONDITIONAL_BASELINE_METRICS:
+        metric = (stride_baseline.get("metrics") or {}).get(field, {})
+        if metric.get("status") != "ready":
+            continue
+        if format_key == "pace":
+            value, suffix = f"{format_pace_seconds(metric['p25'])}–{format_pace_seconds(metric['p75'])}", ""
+        elif format_key == "heart_rate":
+            value, suffix = format_number(metric["p25"], 0) + "–" + format_number(metric["p75"], 0), " bpm"
+        elif format_key == "power":
+            value, suffix = format_number(metric["p25"], 0) + "–" + format_number(metric["p75"], 0), " W"
+        elif format_key == "cadence":
+            value, suffix = format_number(metric["p25"], 1) + "–" + format_number(metric["p75"], 1), " spm"
+        elif format_key == "stride":
+            value, suffix = format_number(metric["p25"], 0) + "–" + format_number(metric["p75"], 0), " mm"
+        else:
+            value, suffix = format_number(metric["p25"], 0) + "–" + format_number(metric["p75"], 0), " ms"
+        stride_lines.append(f"<li><span>{html.escape(label)}</span><strong>{html.escape(value + suffix)}</strong></li>")
+    stride_section = f'<strong class="baseline-subheading">Strides 次要刺激典型範圍</strong><p class="note">Strides 獨立計算，不納入主段 baseline。</p><ul>{"".join(stride_lines)}</ul>' if stride_lines else ""
+    return f'''<div class="conditional-baseline"><strong>近 {sample_count} 堂相近活動的典型範圍</strong><p class="note">這是這組相近活動的近期參考，不代表永久能力值。數字旁已標示「主段」或「整堂」，避免把不同刺激層混在一起。範圍：{html.escape(format_short_datetime(window.get("start")))} 至 {html.escape(format_short_datetime(window.get("end")))}</p><ul>{"".join(lines)}</ul>{stride_section}</div>'''
+
+
+def anomaly_detection_panel(anomalies):
+    if not anomalies:
+        return ""
+    summary = anomalies.get("summary", {})
+    cards = []
+    if summary.get("data") == "flagged":
+        cards.append("<li><strong>資料提醒</strong><span>部分活動的比較指標缺少資料，這些指標不會被拿來判斷表現偏離。</span></li>")
+    if summary.get("context") == "not_assessable":
+        cards.append("<li><strong>情境資料</strong><span>目前沒有足夠的天氣、路線或地形資料可供比較。</span></li>")
+    if summary.get("performance") == "flagged":
+        scope_text = "、".join({"primary_work": "品質主段", "strides": "Strides", "whole_activity": "整堂活動"}.get(scope_name, scope_name) for scope_name in (summary.get("performance_flagged_scope") or [])) or "未標示層級"
+        cards.append(f"<li><strong>表現偏離</strong><span>偏離出現在 {html.escape(scope_text)}；請展開 evidence 查看是哪個指標。</span></li>")
+    behavior_items = []
+    for activity in anomalies.get("activities", []):
+        behavior = activity.get("behavior") or {}
+        primary = behavior.get("primary_work") or {}
+        strides = behavior.get("strides") or {}
+        if primary.get("status") == "ready":
+            behavior_items.append(f"活動 {activity.get('activity_id')}：主段前後半功率差 {float(primary.get('power_delta_w') or 0):.1f}W、HR 差 {float(primary.get('hr_delta_bpm') or 0):.1f} bpm（{primary.get('interpretation')}）")
+        if strides.get("status") == "ready":
+            behavior_items.append(f"活動 {activity.get('activity_id')}：Strides 角色 {strides.get('intent')}、符合度 {strides.get('role_fit')}，{strides.get('interpretation')}")
+    if behavior_items:
+        cards.append(f"<li><strong>訓練行為</strong><span>{html.escape('；'.join(behavior_items[:3]))}</span></li>")
+    longitudinal = anomalies.get("longitudinal_behavior_summary") or {}
+    if longitudinal.get("status") == "ready":
+        role_fit = longitudinal.get("strides_role_fit_counts") or {}
+        cards.append(f"<li><strong>近期重複模式</strong><span>最近 {longitudinal.get('sample_count')} 堂：Strides role fit {role_fit.get('fits_role', 0)}/{sum(role_fit.values()) or 0}；late acceleration {longitudinal.get('late_acceleration_count', 0)} 次。這是行為統計，不是能力分數。</span></li>")
+    if not cards:
+        cards.append("<li><strong>目前沒有明顯偏離</strong><span>可用指標都落在近期比較範圍內。</span></li>")
+    evidence = []
+    for activity in anomalies.get("activities", []):
+        flagged = [item for item in activity.get("evidence", []) if item.get("status") == "flagged"]
+        if flagged:
+            details = "、".join(f"{item.get('scope_label', item.get('metric_scope', '未標示'))} {item.get('metric', '')}：{item.get('reason', '')}" for item in flagged)
+            evidence.append(f"<li><strong>活動 {html.escape(str(activity.get('activity_id')))}</strong><span>{html.escape(details)}</span></li>")
+    return f'''<div class="anomaly-panel"><strong>比較資料提醒</strong><ul class="anomaly-summary-list">{"".join(cards)}</ul><details><summary>查看判定依據</summary><ul class="similar-evidence-list">{"".join(evidence) if evidence else "<li>目前沒有被標記的資料或表現異常。</li>"}</ul></details></div>'''
+
+
+def similar_activities_result_panel(result, activity_rows=None):
+    if not result or result.get("status") != "ok":
+        if result and result.get("status") == "insufficient_anchor_context":
+            missing = ", ".join(result.get("context", {}).get("missing_required_fields", []))
+            return f'<section class="panel-section"><div class="status">無法建立相似活動：anchor 缺少 {html.escape(missing)}。請先補齊標註，或改用自由比較。</div></section>'
+        return ""
+    context = result["context"]
+    rules = context["similarity_rules"]
+    included = result["included"]
+    excluded = result["excluded"]
+    baseline = result.get("baseline")
+    anomalies = result.get("anomalies")
+    activity_by_id = {int(row["activity_id"]): row for row in (activity_rows or [])}
+    anchor_row = activity_by_id.get(int(context["anchor_activity_id"]))
+    anchor_name = (anchor_row["activity_name"] or anchor_row["activity_type"] if anchor_row else "這堂活動")
+    anchor_date = format_short_datetime(anchor_row["activity_start_time"]) if anchor_row else ""
+    anchor_distance = format_number(anchor_row["distance_km"], 2) if anchor_row else ""
+    workout_label = str(rules.get("workout_type_code") or "相同課表").replace("_", " ").title()
+    purpose_label = str(rules.get("primary_purpose_code") or "相同訓練目的").replace("_", " ").title()
+
+    def activity_display(activity_id):
+        row = activity_by_id.get(int(activity_id))
+        if not row:
+            return f"活動 {activity_id}", "", ""
+        name = row["activity_name"] or row["activity_type"] or "未命名活動"
+        return name, format_short_datetime(row["activity_start_time"]), format_number(row["distance_km"], 2)
+
+    def natural_evidence(item, only_fail=False):
+        text = []
+        for entry in item["evidence"]:
+            if only_fail and entry["status"] == "pass":
+                continue
+            rule = entry["rule"]
+            status = entry["status"]
+            detail = entry["detail"]
+            if rule == "lookback_weeks":
+                text.append("在最近 12 週內" if status == "pass" else "超過最近 12 週")
+            elif rule == "workout_type_code":
+                text.append(f"課表類型相同（{workout_label}）" if status == "pass" else f"課表類型不同（{detail}）")
+            elif rule == "primary_purpose_code":
+                text.append(f"訓練目的相同（{purpose_label}）" if status == "pass" else f"訓練目的不同（{detail}）")
+            elif rule == "distance_tolerance_pct":
+                text.append(f"距離在 ±{rules['distance_tolerance_pct']}% 內" if status == "pass" else f"距離不在 ±{rules['distance_tolerance_pct']}% 內")
+            elif rule == "segment_structure":
+                text.append("課表結構已納入參考" if status == "pass" else "課表結構資料不足")
+        return " · ".join(text)
+
+    evidence_lines = []
+    for item in included:
+        name, activity_date, distance = activity_display(item["activity_id"])
+        evidence_lines.append(f'<li><strong>{html.escape(name)}</strong><small>{html.escape(activity_date)} · {html.escape(distance)} km</small><span>{html.escape(natural_evidence(item))}</span></li>')
+    excluded_lines = []
+    for item in excluded[:8]:
+        name, activity_date, distance = activity_display(item["activity_id"])
+        excluded_lines.append(f'<li><strong>{html.escape(name)}</strong><small>{html.escape(activity_date)} · {html.escape(distance)} km</small><span>{html.escape(natural_evidence(item, only_fail=True) or "目前條件不足，無法判定為相似活動")}</span></li>')
+    return f"""
+      <section class="panel-section similar-result-panel">
+        <div class="review-card">
+          <span>相近活動</span>
+          <strong>找到 {len(included)} 堂相近的活動</strong>
+          <p>以「{html.escape(str(anchor_name))}」為基準{f'（{html.escape(anchor_date)} · {html.escape(anchor_distance)} km）' if anchor_date else ''}，整理出可以放在一起比較的歷史活動。</p>
+          <p class="note">篩選條件：相同課表類型 · 相同訓練目的 · 距離相近 · 最近 {html.escape(str(rules['lookback_weeks']))} 週；課表分段僅作為補充說明</p>
+          {conditional_baseline_panel(baseline)}
+          {anomaly_detection_panel(anomalies)}
+          <details><summary>查看納入依據</summary><ul class="similar-evidence-list">{"".join(evidence_lines)}</ul></details>
+          {f'<details><summary>查看未納入的活動（前 8 筆）</summary><ul class="similar-evidence-list">{"".join(excluded_lines)}</ul></details>' if excluded_lines else ''}
+          <details><summary>系統如何找出這些活動</summary><p class="note">系統會先比對課表類型、訓練目的、距離與時間範圍，再依活動日期由新到舊排列；條件相同時，會用內部資料順序確保結果穩定。</p></details>
+        </div>
+      </section>
+    """
+
+
+def comparison_page_panel(activity_rows, selected_rows, selected_ids, comparison_scope, ai_reply, message="", similar_result=None):
+    selected_set = {str(value) for value in selected_ids}
+    options = []
+    for row in activity_rows:
+        activity_id = str(row["activity_id"])
+        checked = " checked" if activity_id in selected_set else ""
+        title = row["activity_name"] or row["activity_type"] or "未命名活動"
+        meta = f"{format_short_datetime(row['activity_start_time'])} · {format_number(row['distance_km'], 2)} km"
+        options.append(
+            f'<label class="compare-activity-option"><input type="checkbox" name="compare" value="{html.escape(activity_id, quote=True)}" data-compare-title="{html.escape(title, quote=True)}" data-compare-meta="{html.escape(meta, quote=True)}"{checked}><span><strong>{html.escape(title)}</strong><small>{html.escape(meta)}</small></span></label>'
+        )
+    compare_id = "-".join(sorted(selected_set, key=lambda value: int(value) if value.isdigit() else value))
+    identifier = f"{comparison_scope}-{compare_id}" if compare_id else ""
+    comparison_context = (similar_result or {}).get("context") if similar_result else None
+    handoff = comparison_handoff_text(selected_rows, comparison_scope, comparison_context, similar_result)
+    image_prompt = comparison_image_prompt(selected_rows, comparison_scope, comparison_context, similar_result)
+    table_headers = ["日期", "活動", "鞋款", "距離", "時間", "配速", "平均心率", "最大心率", "功率", "訓練負荷", "步頻", "步幅", "GCT"]
+    table_rows = []
+    for row in selected_rows:
+        values = [
+            format_short_datetime(row["activity_start_time"]),
+            row["activity_name"] or row["activity_type"] or "未命名活動",
+            row["shoe_display_name"] or "—",
+            f"{format_number(row['distance_km'], 2)} km",
+            format_duration_hms(row["duration_sec"]),
+            format_pace_seconds(row["avg_pace_sec_per_km"]),
+            format_number(row["avg_hr"], 0),
+            format_number(row["max_hr"], 0),
+            format_number(row["avg_power_w"], 0),
+            format_number(row["training_load"], 0),
+            format_number(row["avg_cadence_spm"], 1),
+            format_number(row["avg_stride_length_mm"], 0),
+            format_number(row["avg_gct_ms"], 0),
+        ]
+        table_rows.append("<tr>" + "".join(f"<td>{html.escape(str(value))}</td>" for value in values) + "</tr>")
+    table_html = (
+        f'<div class="compare-table-wrap"><table class="compare-table"><thead><tr>{"".join(f"<th>{html.escape(header)}</th>" for header in table_headers)}</tr></thead><tbody>{"".join(table_rows)}</tbody></table></div>'
+        if table_rows else '<p class="empty-state">尚未選取活動。請先在上方勾選至少一項活動。</p>'
+    )
+    ai_panel = ai_reply_capture_panel("compare", identifier, "活動比較 AI 交棒", "compare", ai_reply, compare=",".join(selected_ids)) if identifier else ""
+    return f"""
+      <section class="panel-section compare-page">
+        {message and f'<div class="status">{html.escape(message)}</div>' or ""}
+        <div class="compare-toolbar">
+          <div><span class="eyebrow">比較範圍</span><strong>活動</strong><p class="note">週比較、月比較會沿用同一頁的選取與 AI 儲存流程。</p></div>
+          <div class="compare-scope-placeholder"><span>週比較</span><span>月比較</span></div>
+        </div>
+        <form method="get" class="compare-selector-form">
+          <input type="hidden" name="page" value="compare">
+          <input type="hidden" name="compare_scope" value="{html.escape(comparison_scope, quote=True)}">
+          <div class="compare-selector-head"><h2>選取活動</h2><span><b id="compare-selected-count">{len(selected_rows)}</b> 項已選取／共 {len(activity_rows)} 項</span></div>
+          <div class="compare-selection-grid"><div class="compare-activity-list">{"".join(options)}</div><aside class="compare-selected-panel"><h3>已選活動</h3><div id="compare-selected-list"></div></aside></div>
+          <div class="form-actions"><button class="primary-action" type="submit">更新比較表</button></div>
+        </form>
+      </section>
+      <section class="panel-section"><h2>活動數據比較</h2>{table_html}</section>
+      {f'''<section class="panel-section" id="compare-ai-handoff"><h2>AI 延伸分析</h2><div class="review-card ai-handoff-card"><span>AI 交棒</span><strong>把這組活動比較直接交給你習慣的 AI</strong><p>如果你想比較多堂活動的差異、找出可能原因與訓練意義，這裡就是完整交棒內容。</p><div class="ai-handoff-block"><div class="ai-handoff-block-head"><div><strong>完整交棒內容</strong><p class="note">包含目前選取活動的比較數據。</p></div><div class="ai-handoff-actions"><button class="secondary-action" type="button" onclick="copyAiHandoff('compare-ai-handoff-text')">複製給 AI</button></div></div><details class="ai-handoff-preview"><summary>先看會交出去的內容</summary><textarea id="compare-ai-handoff-text" readonly>{html.escape(handoff)}</textarea></details></div><p class="note" id="compare-ai-handoff-status">先看完比較表，再複製交給你習慣的 AI 繼續分析。</p></div></section>''' if handoff else ""}
+      {f'''<section class="panel-section" id="compare-image-prompt"><h2>AI 圖片提示</h2><div class="review-card ai-handoff-card"><span>AI 交棒</span><strong>把比較資料交給支援生圖的 AI</strong><p>使用以下提示產生比較圖，完成後可在下方上傳保存。</p><div class="ai-handoff-block"><div class="ai-handoff-block-head"><div><strong>圖片生成提示</strong><p class="note">包含日期、距離、配速、平均心率與訓練負荷。</p></div><div class="ai-handoff-actions"><button class="secondary-action" type="button" onclick="copyAiHandoff('compare-image-prompt-text')">複製給 AI</button></div></div><details class="ai-handoff-preview"><summary>先看會交出去的內容</summary><textarea id="compare-image-prompt-text" readonly>{html.escape(image_prompt)}</textarea></details></div><p class="note" id="compare-image-prompt-text-status">請將提示貼到支援生圖的 AI，完成後在下方上傳保存。</p></div></section>''' if image_prompt else ""}
+      {ai_panel}
+    """
 
 
 def selected_activity(connection, activity_id):
@@ -6172,6 +7387,7 @@ def archive_metric_strip(summary):
 def page_nav(page):
     items = [
         ("activity", "單堂課"),
+        ("compare", "比較"),
         ("home", "總覽"),
         ("weekly", "週回顧"),
         ("monthly", "月回顧"),
@@ -9966,6 +11182,8 @@ def activity_review_panel(
     review = activity_review_payload(activity, split_rows, workout_split_rows)
     workout_name = str(activity["workout_type_name_en"] or activity["activity_type"] or "活動")
     start_time = str(activity["activity_start_time"]).replace("T", " ")[:16]
+    similar_href = "/?" + urlencode({"page": "compare", "anchor_activity": int(activity["activity_id"])})
+    similar_entry = f'<section class="panel-section"><div class="review-card similar-entry-card"><span>活動比較</span><strong>找相似活動</strong><p>以這堂課為基準，找出條件相近、可以放在一起比較的歷史活動。</p><a class="primary-action" href="{html.escape(similar_href, quote=True)}">找相似活動</a></div></section>'
     side_cards = []
     if weekly_review:
         side_cards.append(
@@ -9992,6 +11210,7 @@ def activity_review_panel(
 
     return f"""
       {activity_selector_bar(activity_rows, selected_activity_id)}
+      {similar_entry}
       {activity_facts_panel(activity, split_rows, workout_split_rows)}
       <section class="panel-section" id="activity-summary">
         <h2>活動摘要</h2>
@@ -10585,7 +11804,7 @@ def shoe_detail_panel(shoe, activities, rows):
     total_distance = total_distance if total_distance is not None else tracked_km
     total_count = total_count if total_count is not None else len(activities)
     active_label = "服役中" if shoe["is_active"] else "已退役"
-    category = str(shoe["category"] or "未分類")
+    category = shoe_category_display(shoe["category"])
     target = shoe["retire_target_distance_km"]
     progress = ""
     if target:
@@ -10800,7 +12019,7 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_c
             f"""
             <tr>
               <td><a class="inline-jump-link" href="{html.escape(detail_href, quote=True)}">{html.escape(name)}</a></td>
-              <td>{html.escape(str(row["category"] or ""))}</td>
+              <td class="shoe-category-cell">{shoe_category_lines_html(row["category"])}</td>
               <td>{html.escape(status)}</td>
               <td>{row["run_count"]}</td>
               <td>{format_number(row["total_distance_km"], 2)}</td>
@@ -10847,7 +12066,7 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_c
                   <input type="hidden" name="shoe_id" value="{row["id"]}">
                   <input type="hidden" name="scroll_y" value="">
                 </form>
-                {metadata_select("category", SHOE_CATEGORY_OPTIONS, row["category"] or "", allow_blank=True, form_id=form_id)}
+                {metadata_select("category", shoe_category_options(row["category"]), shoe_category_values(row["category"]), allow_blank=False, form_id=form_id, multiple=True)}
               </td>
               <td>
                   <label class="inline-field">
@@ -10919,7 +12138,7 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_c
               </label>
               <label>
                 <span>初始化分類</span>
-                {metadata_select("category", SHOE_CATEGORY_OPTIONS, "", allow_blank=True)}
+                {metadata_select("category", SHOE_CATEGORY_OPTIONS, [], allow_blank=False, multiple=True)}
               </label>
               <div class="form-actions">
                 <button type="submit">新增鞋款</button>
@@ -11345,7 +12564,7 @@ def metadata_status_label(row):
     return "缺少：" + "、".join(missing)
 
 
-def metadata_select(name, options, selected_code="", allow_blank=False, include_keep=False, form_id=""):
+def metadata_select(name, options, selected_code="", allow_blank=False, include_keep=False, form_id="", multiple=False):
     tags = []
     if include_keep:
         tags.append('<option value="__KEEP__">（保留原值）</option>')
@@ -11362,13 +12581,15 @@ def metadata_select(name, options, selected_code="", allow_blank=False, include_
             label = option[1] if len(option) > 1 else code
             extra = option[2] if len(option) > 2 else ""
         text = label if not extra else f"{label} · {extra}"
-        selected = " selected" if selected_code == code else ""
+        selected_values = set(selected_code if isinstance(selected_code, (list, tuple, set)) else [selected_code])
+        selected = " selected" if code in selected_values else ""
         form_attr = f' form="{html.escape(form_id, quote=True)}"' if form_id else ""
         tags.append(
             f'<option value="{html.escape(code, quote=True)}"{selected}>{html.escape(text)}</option>'
         )
     form_attr = f' form="{html.escape(form_id, quote=True)}"' if form_id else ""
-    return f'<select name="{html.escape(name, quote=True)}"{form_attr}>{"".join(tags)}</select>'
+    multiple_attr = ' multiple size="9"' if multiple else ""
+    return f'<select name="{html.escape(name, quote=True)}"{multiple_attr}{form_attr}>{"".join(tags)}</select>'
 
 
 def metadata_edit_suggestions(connection, selected_row, workout_purpose_rows):
@@ -12161,6 +13382,43 @@ def base_styles():
       width: min(1180px, calc(100vw - 32px));
       margin: 26px auto 44px;
     }
+    .back-to-top {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 20;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 42px;
+      padding: 0 14px 0 11px;
+      border: 1px solid rgba(20, 50, 85, 0.14);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--accent-deep);
+      box-shadow: 0 10px 24px rgba(18, 35, 58, 0.16);
+      font-size: 12px;
+      font-weight: 800;
+      text-decoration: none;
+      backdrop-filter: blur(10px);
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+    .back-to-top:hover {
+      transform: translateY(-3px);
+      background: #ffffff;
+      box-shadow: 0 14px 28px rgba(18, 35, 58, 0.20);
+    }
+    .back-to-top span {
+      display: grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--teal);
+      font-size: 18px;
+      line-height: 1;
+    }
     .hero {
       margin: 0 0 18px;
       padding: 28px 30px;
@@ -12395,6 +13653,132 @@ def base_styles():
       font-size: 18px;
       letter-spacing: 0;
     }
+    .compare-toolbar,
+    .compare-selector-head,
+    .compare-scope-placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .compare-toolbar,
+    .compare-selector-form {
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 8px 22px rgba(31, 41, 51, 0.05);
+    }
+    .compare-toolbar strong { display: block; margin-top: 4px; font-size: 24px; }
+    .compare-toolbar p { margin: 6px 0 0; }
+    .compare-scope-placeholder span {
+      padding: 8px 12px;
+      border: 1px dashed var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .compare-selector-form { margin-top: 14px; }
+    .compare-selector-head { margin-bottom: 12px; }
+    .compare-selector-head h2 { margin: 0; }
+    .compare-selector-head span { color: var(--muted); font-size: 13px; }
+    .compare-selection-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr); gap: 18px; align-items: start; }
+    .compare-activity-list { display: grid; grid-template-columns: 1fr; gap: 8px; max-height: 520px; overflow: auto; padding: 2px; }
+    .compare-activity-option { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+    .compare-activity-option:hover { border-color: #9fc7d8; background: #f7fbfd; }
+    .compare-activity-option input { margin-top: 4px; }
+    .compare-activity-option span { display: grid; gap: 4px; }
+    .compare-activity-option small { color: var(--muted); }
+    .compare-selected-panel { position: sticky; top: 18px; min-height: 160px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #f7fafb; }
+    .compare-selected-panel h3 { margin: 0 0 10px; font-size: 16px; }
+    .compare-selected-item { display: grid; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .compare-selected-item:last-child { border-bottom: 0; }
+    .compare-selected-item small { color: var(--muted); }
+    .compare-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+    .compare-table { width: 100%; min-width: 1180px; border-collapse: collapse; font-size: 14px; }
+    .compare-table th, .compare-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+    .compare-table th { background: #f5f8fa; color: var(--muted); font-size: 12px; }
+    .compare-table tr:last-child td { border-bottom: 0; }
+    .similar-entry-card { display: grid; gap: 8px; align-content: start; }
+    .similar-entry-card strong { font-size: 24px; }
+    .similar-entry-card p { margin: 0; color: var(--muted); line-height: 1.5; }
+    .similar-entry-card .primary-action { justify-self: start; text-decoration: none; }
+    .similar-evidence-list { display: grid; gap: 10px; margin: 10px 0 0; padding-left: 20px; color: var(--muted); line-height: 1.5; }
+    .similar-evidence-list li { padding-left: 4px; }
+    .similar-evidence-list li strong,
+    .similar-evidence-list li small,
+    .similar-evidence-list li span { display: block; }
+    .similar-evidence-list li strong { color: var(--ink); font-size: 15px; }
+    .similar-evidence-list li small { margin-top: 2px; color: var(--muted); }
+    .conditional-baseline {
+      display: grid;
+      gap: 8px;
+      margin-top: 4px;
+      padding: 14px 16px;
+      border: 1px solid #dce8ee;
+      border-radius: 12px;
+      background: #f8fbfc;
+    }
+    .conditional-baseline > strong {
+      color: var(--ink);
+      font-size: 18px;
+      line-height: 1.25;
+    }
+    .conditional-baseline .note {
+      font-size: 12px;
+      line-height: 1.45;
+      font-weight: 600;
+    }
+    .conditional-baseline ul {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 18px;
+      margin: 2px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    .conditional-baseline li {
+      display: grid;
+      grid-template-columns: minmax(86px, auto) 1fr;
+      align-items: baseline;
+      gap: 8px;
+      min-width: 0;
+      padding: 7px 0;
+      border-bottom: 1px solid #e5eef2;
+    }
+    .conditional-baseline li > span {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .conditional-baseline li strong {
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 1.25;
+      white-space: nowrap;
+    }
+    .conditional-baseline li small {
+      grid-column: 2;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+    }
+    .anomaly-panel {
+      display: grid;
+      gap: 8px;
+      margin-top: 4px;
+      padding: 14px 16px;
+      border: 1px solid #e5e8da;
+      border-radius: 12px;
+      background: #fcfcf7;
+    }
+    .anomaly-panel > strong { color: var(--ink); font-size: 17px; }
+    .anomaly-summary-list { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+    .anomaly-summary-list li { display: grid; gap: 2px; padding: 7px 0; border-bottom: 1px solid #eceee4; }
+    .anomaly-summary-list li:last-child { border-bottom: 0; }
+    .anomaly-summary-list strong { color: var(--ink); font-size: 14px; }
+    .anomaly-summary-list span { color: var(--muted); font-size: 12px; line-height: 1.4; }
     .settings-page-title {
       margin: 0 0 14px;
       font-size: 24px;
@@ -13616,6 +15000,14 @@ def base_styles():
       grid-template-columns: repeat(2, minmax(0, 1fr));
       margin-bottom: 0;
     }
+    .shoe-category-cell {
+      min-width: 150px;
+      white-space: nowrap;
+    }
+    .shoe-category-line {
+      display: block;
+      line-height: 1.45;
+    }
     .shoe-detail-hero {
       padding-top: 28px;
     }
@@ -14792,6 +16184,7 @@ def base_styles():
       max-width: 320px;
     }
     @media (max-width: 760px) {
+      .back-to-top { right: 14px; bottom: 14px; min-height: 40px; padding-right: 12px; }
       main { width: min(100vw - 20px, 1040px); margin: 18px auto; }
       .hero { padding: 20px; border-radius: 18px; min-height: 0; }
       .hero-shell,
@@ -14837,6 +16230,9 @@ def base_styles():
       .metadata-form { grid-template-columns: 1fr; }
       .metadata-batch-bar { grid-template-columns: 1fr; }
       .weekly-review-settings-form { grid-template-columns: 1fr; }
+      .compare-selection-grid { grid-template-columns: 1fr; }
+      .compare-selected-panel { position: static; }
+      .conditional-baseline ul { grid-template-columns: 1fr; }
       .weekly-review-settings-form .form-actions button { width: 100%; }
       .scope-link-grid { grid-template-columns: 1fr; }
       .month-selector-bar { flex-direction: column; align-items: stretch; }
@@ -14850,6 +16246,7 @@ def page_hero(page):
     page_labels = {
         "home": ("今日焦點", "今天先看恢復", "先把恢復顧好，再看本週真正留下了什麼。"),
         "activity": ("活動", "這堂課留下了什麼", "把單次活動整理成可理解的回顧。"),
+        "compare": ("比較", "把活動放在一起看", "多選活動，找出數據差異與訓練線索。"),
         "weekly": ("週回顧", "這週留下了什麼", "先看本週狀態，再看下一步。"),
         "monthly": ("月回顧", "現在走到哪裡", "用月度節奏看趨勢與轉折。"),
         "journey": ("訓練旅程", "時間怎麼串起來", "把每個月串成一段旅程。"),
@@ -14862,6 +16259,7 @@ def page_hero(page):
     cta_map = {
         "home": ("查看本週反思", "/?page=weekly"),
         "activity": ("查看本週回顧", "/?page=weekly"),
+        "compare": ("查看單堂活動", "/?page=activity"),
         "weekly": ("查看月回顧", "/?page=monthly"),
         "monthly": ("查看旅程", "/?page=journey"),
         "journey": ("查看設定", "/?page=settings"),
@@ -14893,7 +16291,7 @@ def page_hero(page):
     """
 
 
-def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="unassigned", message="", month="", week="", batch="1", coach_step=None, scroll_y="", shoe_code=""):
+def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="unassigned", message="", month="", week="", batch="1", coach_step=None, scroll_y="", shoe_code="", compare="", compare_scope="activity", anchor_activity=""):
     handoff_script = """
   <script>
     function extractAiReplyMarkdown(raw) {
@@ -14950,6 +16348,32 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
 
     document.addEventListener("DOMContentLoaded", function () {
       document.querySelectorAll("form.ai-reply-form").forEach(refreshAiReplyPreview);
+      refreshCompareSelection();
+    });
+
+    function refreshCompareSelection() {
+      const target = document.getElementById("compare-selected-list");
+      const count = document.getElementById("compare-selected-count");
+      if (!target) return;
+      const checked = [...document.querySelectorAll('input[name="compare"]:checked')];
+      target.innerHTML = "";
+      if (!checked.length) {
+        target.innerHTML = '<p class="empty-state">尚未選取活動</p>';
+      } else {
+        checked.forEach(function (input) {
+          const item = document.createElement("div");
+          item.className = "compare-selected-item";
+          item.innerHTML = '<strong></strong><small></small>';
+          item.querySelector("strong").textContent = input.dataset.compareTitle || "未命名活動";
+          item.querySelector("small").textContent = input.dataset.compareMeta || "";
+          target.appendChild(item);
+        });
+      }
+      if (count) count.textContent = String(checked.length);
+    }
+
+    document.addEventListener("change", function (event) {
+      if (event.target.matches('input[name="compare"]')) refreshCompareSelection();
     });
 
     async function copyAiHandoff(id) {
@@ -15124,13 +16548,14 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
   {handoff_script}
 </head>
 <body>
-  <main>
+  <main id="top">
     {page_hero(page)}
     {page_nav(page)}
     {message and f'<section class="status">{html.escape(message)}</section>' or ""}
     {no_data_yet_panel()}
     {rac_entry_panel()}
   </main>
+  <a class="back-to-top" href="#top" aria-label="回到頁面頂端" title="回到頂端"><span aria-hidden="true">↑</span><b>回到頂端</b></a>
 </body>
 </html>"""
 
@@ -15170,6 +16595,10 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
     recent_training_rows = []
     overview_ai_reply = None
     activity_ai_reply = None
+    compare_activity_rows = []
+    compare_selected_rows = []
+    compare_ai_reply = None
+    similar_result = None
     weekly_ai_reply = None
     monthly_ai_reply = None
     shoe_rows = []
@@ -15251,6 +16680,24 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
             monthly = selected_month_summary(connection, None)
             monthly_review = selected_month_intelligence(connection, None)
             monthly_progress_row = selected_month_progress(connection, None)
+
+        elif page == "compare":
+            activity_rows = available_activities(connection, limit=None)
+            selected_compare_ids = [value for value in str(compare or "").split(",") if value.strip()]
+            if str(anchor_activity).isdigit() and not selected_compare_ids:
+                similar_context = build_comparison_context(connection, int(anchor_activity))
+                similar_result = find_similar_activities(connection, similar_context)
+                similar_result["baseline"] = calculate_conditional_baseline(connection, similar_result)
+                similar_result["anomalies"] = detect_comparison_anomalies(similar_result, similar_result["baseline"])
+                selected_compare_ids = [str(item["activity_id"]) for item in similar_result.get("included", [])]
+            compare_selected_rows = comparison_activity_rows(connection, selected_compare_ids)
+            compare_activity_rows = activity_rows
+            compare_scope = str(compare_scope or "activity").strip().lower()
+            if compare_scope not in {"activity", "week", "month"}:
+                compare_scope = "activity"
+            if compare_selected_rows:
+                compare_identifier = f"{compare_scope}-" + "-".join(sorted(str(row["activity_id"]) for row in compare_selected_rows))
+                compare_ai_reply = get_ai_reply("compare", compare_identifier)
 
         elif page == "journey":
             month_rows = available_months(connection)
@@ -15378,9 +16825,10 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
   {handoff_script}
 </head>
 <body>
-  <main>
+  <main id="top">
     {page_hero(page)}
     {page_nav(page)}
+    <a class="back-to-top" href="#top" aria-label="回到頁面頂端" title="回到頂端"><span aria-hidden="true">↑</span><b>回到頂端</b></a>
 """
     message_html = f'<section class="status">{html.escape(message)}</section>' if message else ""
 
@@ -15397,6 +16845,16 @@ def render_dashboard(activity_id="", page="home", edit_activity_id="", scope="un
     if page == "activity":
         return f"""{html_start}
     {activity_review_panel(selected, split_rows, workout_split_rows, activity_rows, selected["activity_id"] if selected else "", activity_shoe_rows, activity_workout_rows, activity_purpose_rows, coach_step, weekly_review, monthly_overview, wsi, activity_ai_reply)}
+    {archive_metric_strip(summary)}
+  </main>
+</body>
+</html>"""
+
+    if page == "compare":
+        selected_compare_ids = [str(row["activity_id"]) for row in compare_selected_rows]
+        return f"""{html_start}
+    {similar_activities_result_panel(similar_result, compare_activity_rows)}
+    {comparison_page_panel(compare_activity_rows, compare_selected_rows, selected_compare_ids, compare_scope, compare_ai_reply, message, similar_result)}
     {archive_metric_strip(summary)}
   </main>
 </body>
@@ -15560,7 +17018,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         query = parse_qs(parsed.query)
         page = (query.get("page") or ["home"])[0]
-        if page not in {"home", "activity", "journey", "weekly", "monthly", "shoes", "training", "metadata", "settings"}:
+        if page not in {"home", "activity", "compare", "journey", "weekly", "monthly", "shoes", "training", "metadata", "settings"}:
             page = "home"
         self.send_html(
             render_dashboard(
@@ -15575,6 +17033,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 (query.get("coach_step") or [None])[0],
                 (query.get("scroll_y") or [""])[0],
                 (query.get("shoe") or [""])[0],
+                ",".join(query.get("compare", [])),
+                (query.get("compare_scope") or ["activity"])[0],
+                (query.get("anchor_activity") or [""])[0],
             )
         )
 
@@ -15592,6 +17053,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             activity_id = first_form_value(form, "activity_id", "").strip()
             week = first_form_value(form, "week", "").strip()
             month = first_form_value(form, "month", "").strip()
+            compare = first_form_value(form, "compare", "").strip()
             scroll_y = first_form_value(form, "scroll_y", "").strip()
             raw_text = first_form_value(form, "ai_reply_raw", "")
 
@@ -15608,6 +17070,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 params["week"] = week
             if month:
                 params["month"] = month
+            if compare:
+                params["compare"] = compare
             if scroll_y:
                 params["scroll_y"] = scroll_y
             self.redirect("/?" + urlencode(params))
@@ -15622,6 +17086,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             activity_id = first_form_value(form, "activity_id", "").strip()
             week = first_form_value(form, "week", "").strip()
             month = first_form_value(form, "month", "").strip()
+            compare = first_form_value(form, "compare", "").strip()
             scroll_y = first_form_value(form, "scroll_y", "").strip()
             uploaded = form.get("ai_reply_image")
             uploaded_file = None
@@ -15646,6 +17111,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 params["week"] = week
             if month:
                 params["month"] = month
+            if compare:
+                params["compare"] = compare
             if scroll_y:
                 params["scroll_y"] = scroll_y
             self.redirect("/?" + urlencode(params))
@@ -15660,6 +17127,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             activity_id = first_form_value(form, "activity_id", "").strip()
             week = first_form_value(form, "week", "").strip()
             month = first_form_value(form, "month", "").strip()
+            compare = first_form_value(form, "compare", "").strip()
             scroll_y = first_form_value(form, "scroll_y", "").strip()
 
             if not surface or not identifier or not filename:
@@ -15680,6 +17148,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 params["week"] = week
             if month:
                 params["month"] = month
+            if compare:
+                params["compare"] = compare
             if scroll_y:
                 params["scroll_y"] = scroll_y
             self.redirect("/?" + urlencode(params))
@@ -15688,7 +17158,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if parsed.path == "/shoes/add":
             form = parse_qs(body.decode("utf-8"))
             scroll_y = first_form_value(form, "scroll_y", "").strip()
-            category = first_form_value(form, "category", "").strip()
+            category = form.get("category", [])
             try:
                 with connect() as connection:
                     shoe_name = append_shoe_option(first_form_value(form, "shoe_name"), connection)
@@ -15701,7 +17171,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                             category,
                         )
                     connection.commit()
-                message = f"已新增鞋款：{shoe_name}" + (f"（{category}）" if category else "")
+                message = f"已新增鞋款：{shoe_name}" + (f"（{shoe_category_display(category)}）" if category else "")
             except ValueError as exc:
                 message = str(exc)
             except Exception:
@@ -15718,7 +17188,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             shoe_id = int(first_form_value(form, "shoe_id", "0") or "0")
             is_active = 1 if first_form_value(form, "is_active", "1") == "1" else 0
             retire_date = first_form_value(form, "retire_date", "").strip() or None
-            category = first_form_value(form, "category", "").strip()
+            category = form.get("category", [])
             scroll_y = first_form_value(form, "scroll_y", "").strip()
 
             with connect() as connection:
@@ -16083,7 +17553,7 @@ def main():
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
 
-    DB_PATH = args.db
+    DB_PATH = args.db.expanduser().resolve()
     url = f"http://{args.host}:{args.port}"
     if not args.no_browser:
         open_browser_later(url)

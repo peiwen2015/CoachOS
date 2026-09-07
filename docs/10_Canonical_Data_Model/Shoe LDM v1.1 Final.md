@@ -108,21 +108,27 @@ Display names may change later, but `shoe_code` should not change unless correct
 
 ### category
 
-`category` is a controlled vocabulary describing the shoe's general usage category.
+`category` is a controlled vocabulary describing one or more general usage categories for the shoe.
 
-Recommended v1 values:
+Recommended v1.5.1 values:
 
 ```text
 Recovery
-Daily Trainer
-Tempo
+Easy / Aerobic
+Steady / Progression
 Long Run
+Tempo / Threshold / HM Pace
+Speed / Interval / Strides
 Race
-Walking
-Trail
 ```
 
+Existing values from the retired vocabulary are not migrated automatically.
+They are shown as `需重新選擇` until the shoe is explicitly reclassified with
+the current vocabulary. This avoids silently guessing a shoe's training role.
+
 This is not a coaching default. It describes the shoe, not what today's workout should be.
+
+The product allows multiple categories because one shoe may reasonably serve as a daily trainer, long-run shoe, and tempo shoe. In the current SQLite `TEXT` field, selected category codes are stored as a JSON array for compatibility with the existing schema.
 
 When `category` is blank, the product displays `未分類`. This means the shoe's descriptive category has not been set; it does not mean that the activity's workout type, training purpose, or shoe assignment is missing.
 

@@ -138,6 +138,9 @@ Review:
 - Refine shoe intelligence language
 - Emphasize coaching insight
 - Reduce raw metric focus
+- Make shoe categories multi-select and visibly persistent after save
+- Keep the full category vocabulary visible without an inner-scroll interaction
+- Render each selected shoe category on its own line inside the overview table so later metrics remain readable
 
 ### Training
 

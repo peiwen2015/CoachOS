@@ -196,7 +196,7 @@ The Shoes detail surface combines:
 - `shoe_comparison_view` for total distance, activity count, observed dates, pace, heart rate, and load summaries
 - `activity_review_view` filtered by the stable `shoe_code` for the newest-first tracked activity list
 
-The surface is navigated by `shoe_code`, not by a mutable display name. `category` is a descriptive shoe field; an empty value is rendered as `未分類` and must not be interpreted as missing activity metadata.
+The surface is navigated by `shoe_code`, not by a mutable display name. `category` is a descriptive multi-value shoe field stored as a JSON array in the existing `TEXT` column; legacy single-value strings remain supported. An empty value is rendered as `未分類` and must not be interpreted as missing activity metadata.
 
 `recent_activity_view`
 

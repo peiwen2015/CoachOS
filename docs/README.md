@@ -100,14 +100,20 @@ flowchart TD
 10. `00_Governance/CoachOS Chart Priorities v0.1.md`
 11. `00_Governance/CoachOS Chart Requirements Specification v0.1.md`
 12. `00_Governance/CoachOS Chart Semantic View and Data Field Mapping v0.1.md`
-13. `30_Physical_Model/CoachOS Chart Semantic View SQL Draft v0.1.sql`
-14. `30_Physical_Model/CoachOS Chart Semantic View SQL Notes v0.1.md`
-15. `20_Architecture/CoachOS Chart Rendering Contract v0.1.md`
-16. `20_Architecture/CoachOS Chart API Payload Examples v0.1.md`
-17. `00_Governance/Running Analytics Metadata Repository v1.1.md`
-18. `00_Governance/Metadata Design Standard v1.0.md`
-19. `01_ADR/`
-20. `00_Governance/Canonical Data Model Release Notes.md`
+13. `00_Governance/CoachOS Activity Comparison Product Specification v1.0.md`
+14. `00_Governance/CoachOS Comparison Intelligence Evolution Specification v1.0.md`
+15. `20_Architecture/CoachOS Comparison Intelligence Design Review v0.1.md`
+16. `20_Architecture/CoachOS Similar Activities Phase 1 Implementation Specification v1.0.md`
+17. `20_Architecture/CoachOS Similar Activities Phase 1 Implementation Task Breakdown v1.0.md`
+18. `20_Architecture/CoachOS Conditional Baseline Phase 2 Implementation Specification v1.0.md`
+19. `30_Physical_Model/CoachOS Chart Semantic View SQL Draft v0.1.sql`
+20. `30_Physical_Model/CoachOS Chart Semantic View SQL Notes v0.1.md`
+21. `20_Architecture/CoachOS Chart Rendering Contract v0.1.md`
+22. `20_Architecture/CoachOS Chart API Payload Examples v0.1.md`
+23. `00_Governance/Running Analytics Metadata Repository v1.1.md`
+24. `00_Governance/Metadata Design Standard v1.0.md`
+25. `01_ADR/`
+26. `00_Governance/Canonical Data Model Release Notes.md`
 21. `10_Canonical_Data_Model/Activity LDM v1.1 Final.md`
 22. `10_Canonical_Data_Model/LDM Validation Round 1 - activity.md`
 23. `10_Canonical_Data_Model/Kilometer Split LDM v1.1 Final.md`

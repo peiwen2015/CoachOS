@@ -57,6 +57,13 @@ Application
 | CoachOS Chart Semantic View and Data Field Mapping | v0.1 | Governance | Draft | `00_Governance/CoachOS Chart Semantic View and Data Field Mapping v0.1.md` |
 | CoachOS Chart Semantic View SQL Draft | v0.1 | Physical model draft | Draft | `30_Physical_Model/CoachOS Chart Semantic View SQL Draft v0.1.sql` |
 | CoachOS Chart Semantic View SQL Notes | v0.1 | Metric notes | Draft | `30_Physical_Model/CoachOS Chart Semantic View SQL Notes v0.1.md` |
+| CoachOS Activity Comparison Product Specification | v1.0 | Product / UX / AI handoff specification | Approved | `00_Governance/CoachOS Activity Comparison Product Specification v1.0.md` |
+| CoachOS Comparison Intelligence Evolution Specification | v1.0 | Product evolution / intelligence architecture | Draft | `00_Governance/CoachOS Comparison Intelligence Evolution Specification v1.0.md` |
+| CoachOS Comparison Intelligence Design Review | v0.1 | Design review / implementation gate | Approved for Phase 1 | `20_Architecture/CoachOS Comparison Intelligence Design Review v0.1.md` |
+| CoachOS Similar Activities Phase 1 Implementation Specification | v1.0 | Implementation specification | Implemented and validated | `20_Architecture/CoachOS Similar Activities Phase 1 Implementation Specification v1.0.md` |
+| CoachOS Similar Activities Phase 1 Implementation Task Breakdown | v1.0 | Test-first implementation plan | Implemented and validated | `20_Architecture/CoachOS Similar Activities Phase 1 Implementation Task Breakdown v1.0.md` |
+| CoachOS Conditional Baseline Phase 2 Implementation Specification | v1.0 | Implementation specification | Ready for implementation | `20_Architecture/CoachOS Conditional Baseline Phase 2 Implementation Specification v1.0.md` |
+| CoachOS Longitudinal Behavior Summary Phase 4 Implementation Specification | v1.0 | Implementation specification | Implemented and validated | `20_Architecture/CoachOS Longitudinal Behavior Summary Phase 4 Implementation Specification v1.0.md` |
 | CoachOS Chart Rendering Contract | v0.1 | Architecture | Draft | `20_Architecture/CoachOS Chart Rendering Contract v0.1.md` |
 | CoachOS Chart API Payload Examples | v0.1 | Architecture | Draft | `20_Architecture/CoachOS Chart API Payload Examples v0.1.md` |
 | Architecture Roadmap | v1.0 | Governance | Evolving | `00_Governance/Architecture Roadmap.md` |

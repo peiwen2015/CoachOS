@@ -6,7 +6,7 @@
 
 ## Release Status
 
-- `v1.5.1` 已正式發布
+- `v1.6.0` 已正式發布
 - 產品對外主名稱維持 `CoachOS`
 - 核心資料鏈路已固定為 `FIT -> Excel -> SQLite -> Semantic Layer -> Dashboard`
 - `Workout Sequence Intelligence` 已接進 `Activity -> Weekly -> Monthly -> AI 交棒`

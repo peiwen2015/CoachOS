@@ -4,6 +4,7 @@ from __future__ import annotations
 import html
 import json
 import calendar
+import argparse
 import mimetypes
 import socket
 import sqlite3
@@ -3627,6 +3628,13 @@ def open_browser_later(url):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Run the CoachOS FIT import studio.")
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="啟動服務時不要自動開啟轉檔頁；由其他入口負責導向頁面。",
+    )
+    args = parser.parse_args()
     try:
         initialize_app_state()
     except Exception as error:
@@ -3647,7 +3655,8 @@ def main():
         return
     url = f"http://{HOST}:{PORT}"
     print(f"CoachOS v{APP_VERSION}: {url}")
-    open_browser_later(url)
+    if not args.no_browser:
+        open_browser_later(url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

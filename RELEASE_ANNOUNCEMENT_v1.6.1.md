@@ -8,6 +8,8 @@ CoachOS v1.6.1 已發布。
 
 路線資料以活動名稱與爬升摘要呈現，不會把精確 GPS 座標交給 AI；缺少的欄位會保持空白，不會由平台猜測。另從 CoachOS 進入資料匯入工具時，FIT 下載頁現在預設選取「只下載今天」，減少日常匯入操作。
 
+本版本也修正首次啟動資料匯入工具時，頁面短暫顯示下載 FIT 後又被自動帶回轉檔頁的問題。
+
 ## English
 
 CoachOS v1.6.1 is released.
@@ -15,3 +17,5 @@ CoachOS v1.6.1 is released.
 This patch improves the context carried from Activity Comparison to AI. In addition to pace, heart rate, power, running dynamics, and training load, the handoff table now includes available temperature, humidity, wind, weather, shoe, RPE, perceived feeling, Stamina, elevation gain, and elevation loss data.
 
 Route context is represented by the activity name and elevation summaries; exact GPS coordinates are not exported to AI. Missing fields remain blank instead of being inferred. When entering the data import tool from CoachOS, the FIT download page now defaults to “Download today only” to simplify daily imports.
+
+This version also fixes an issue where the first launch briefly showed the FIT download page and then redirected back to the conversion page.

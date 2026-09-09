@@ -5329,7 +5329,7 @@ def ensure_rac_running():
     RAC_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with RAC_LOG_PATH.open("ab") as log_file:
         subprocess.Popen(
-            [python_cmd, str(RAC_APP_PATH)],
+            [python_cmd, str(RAC_APP_PATH), "--no-browser"],
             cwd=str(PROJECT_ROOT),
             stdout=log_file,
             stderr=log_file,

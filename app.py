@@ -2715,7 +2715,7 @@ def month_options(selected_month):
     return "\n".join(tags)
 
 
-def render_download_fit_page(message="", error=""):
+def render_download_fit_page(message="", error="", download_mode="today"):
     config = load_garmin_config()
     today = dt.date.today()
     remembered = " checked" if config.get("password") else ""
@@ -2751,11 +2751,11 @@ def render_download_fit_page(message="", error=""):
         <legend>下載範圍</legend>
         <div class="grid">
           <label class="inline wide">
-            <input type="radio" name="download_mode" value="today">
+            <input type="radio" name="download_mode" value="today"{" checked" if download_mode == "today" else ""}>
             <span>只下載今天</span>
           </label>
           <label class="inline wide">
-            <input type="radio" name="download_mode" value="month" checked>
+            <input type="radio" name="download_mode" value="month"{" checked" if download_mode == "month" else ""}>
             <span>下載指定月份</span>
           </label>
           <label>
@@ -3337,7 +3337,10 @@ class AppHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         if parsed.path == "/download-fit":
-            self.send_html(render_download_fit_page())
+            download_mode = first_value(query, "download_mode") or "today"
+            if download_mode not in {"today", "month"}:
+                download_mode = "today"
+            self.send_html(render_download_fit_page(download_mode=download_mode))
             return
         if parsed.path == "/download-fit-status":
             self.send_json(download_job_snapshot(first_value(query, "job")))

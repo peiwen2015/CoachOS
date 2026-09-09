@@ -6,12 +6,14 @@
 
 ## Release Status
 
-- `v1.6.0` 已正式發布
+- `v1.6.1` 已正式發布
 - 產品對外主名稱維持 `CoachOS`
 - 核心資料鏈路已固定為 `FIT -> Excel -> SQLite -> Semantic Layer -> Dashboard`
 - `Workout Sequence Intelligence` 已接進 `Activity -> Weekly -> Monthly -> AI 交棒`
 - `AI 延伸分析` 可把整理結果複製給 AI，並可將回覆寫回頁面
 - `Comparison Intelligence` 可依主段、整堂活動與 Strides 分層比較，並追蹤近期訓練行為模式
+- `AI 比較交棒表` 已納入氣溫、濕度、風、天氣、鞋款、RPE、感受、Stamina、爬升與下降等可用上下文
+- `進入資料匯入工具` 預設開啟 FIT 下載頁並選取「只下載今天」
 - `每日 / 每週 / 每月訓練圖卡 prompt` 已可直接從平台交給圖像 AI
 - `GPS backfill`、`課表結構 backfill` 與 `心率 / 欄位修補` 已可回補到 Excel 與 SQLite
 - `訓練序列理解` 可從資料匯入工具批次重算並寫回 SQLite，Excel 仍保持單純

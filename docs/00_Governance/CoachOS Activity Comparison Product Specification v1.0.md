@@ -82,6 +82,8 @@
 - 若資料能辨識每一組 Stride，應提供逐組 evidence；不能辨識時只提供 Strides aggregate，不得自行推測組數。
 - 前後半 evidence 必須先檢查功率是否仍在同一比較區間；功率已提高時，UI 與 AI handoff 顯示為「輸出提高下的變化」，不得直接稱為心率漂移。
 - Strides aggregate 只作摘要；若逐組資料存在，主要判讀應以組間一致性與最後一組突增為優先。
+- AI handoff 的活動比較表應包含可用的環境欄位：氣溫、濕度、風速、風向與天氣描述；缺值留空並保留 `not_assessable` 語義，不得補猜。
+- AI handoff 也應包含可用的比較上下文：鞋款、RPE／主觀感受、Stamina 起始／結束／下降、爬升與下降。路線以活動名稱或非敏感路線描述表示，不直接輸出精確 GPS 座標。
 - `segment_intent` 必須記錄意圖值、來源與信心；由活動標籤推導的意圖只能作為低信心比較上下文，不得當成使用者明確設定。
 - `performance_deviation`（偏離 baseline 的方向）與 `role_fit`（是否符合訓練角色）必須分開呈現；偏離 baseline 不等於執行錯誤。
 - 前後半與 Strides 組間行為應使用固定命名 contract，避免 AI 重新從 raw metrics 猜測執行模式。

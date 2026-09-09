@@ -5581,8 +5581,25 @@ def comparison_activity_rows(connection, activity_ids):
         item = dict(row)
         item["segment_metrics"] = activity_segment_metrics(connection, row["activity_id"])
         item["segment_intent"] = infer_segment_intent(row)
+        item.update(activity_route_metrics(connection, row["activity_id"]))
         enriched.append(item)
     return enriched
+
+
+def activity_route_metrics(connection, activity_id):
+    """Return non-sensitive route context for comparison handoff."""
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(kilometer_split)").fetchall()}
+    required = {"activity_id", "elevation_gain_m", "elevation_loss_m"}
+    if not required.issubset(columns):
+        return {"elevation_gain_m": None, "elevation_loss_m": None}
+    row = connection.execute(
+        "SELECT SUM(elevation_gain_m) AS elevation_gain_m, SUM(elevation_loss_m) AS elevation_loss_m FROM kilometer_split WHERE activity_id = ?",
+        (activity_id,),
+    ).fetchone()
+    return {
+        "elevation_gain_m": row["elevation_gain_m"] if row else None,
+        "elevation_loss_m": row["elevation_loss_m"] if row else None,
+    }
 
 
 def infer_segment_intent(row):
@@ -5712,8 +5729,9 @@ def comparison_handoff_text(rows, scope="activity", comparison_context=None, sim
         "請分析以下 CoachOS 活動比較資料。請比較配速、心率、功率、步態與訓練負荷，指出差異、異常值、可能原因，以及對後續訓練的具體建議。不要只重述表格，請以教練角度給出結論。",
         "",
         f"比較範圍：{scope_label}",
-        "| 日期 | 活動 | 距離 km | 時間 | 配速 | 平均心率 | 最大心率 | 功率 W | 訓練負荷 | 步頻 | 步幅 mm | GCT ms |",
-        "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        "環境與比較上下文欄位為活動層級資料；空白表示來源沒有可靠值，AI 不應自行補猜。路線以活動名稱／路線描述呈現，不直接輸出精確 GPS 座標。",
+        "| 日期 | 活動／路線 | 鞋款 | 距離 km | 時間 | 配速 | 平均心率 | 最大心率 | 功率 W | 訓練負荷 | 步頻 | 步幅 mm | GCT ms | 氣溫 °C | 濕度 % | 風速 m/s | 風向 ° | 天氣 | 爬升 m | 下降 m | RPE | 感受 | Stamina 起始 % | Stamina 結束 % | Stamina 下降 |",
+        "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---|---|---:|---:|---:|",
     ]
     if comparison_context:
         rules = comparison_context.get("similarity_rules", {})
@@ -5791,9 +5809,10 @@ def comparison_handoff_text(rows, scope="activity", comparison_context=None, sim
                 ])
     for row in rows:
         lines.append(
-            "| {date} | {name} | {distance} | {duration} | {pace} | {hr} | {max_hr} | {power} | {load} | {cadence} | {stride} | {gct} |".format(
+            "| {date} | {name} | {shoe} | {distance} | {duration} | {pace} | {hr} | {max_hr} | {power} | {load} | {cadence} | {stride} | {gct} | {temperature} | {humidity} | {wind_speed} | {wind_direction} | {weather} | {gain} | {loss} | {rpe} | {feeling} | {stamina_start} | {stamina_end} | {stamina_drop} |".format(
                 date=format_short_datetime(row["activity_start_time"]),
                 name=(row["activity_name"] or row["activity_type"] or "未命名活動"),
+                shoe=row.get("shoe_display_name") or "",
                 distance=format_number(row["distance_km"], 2),
                 duration=format_duration_hms(row["duration_sec"]),
                 pace=format_pace_seconds(row["avg_pace_sec_per_km"]),
@@ -5804,6 +5823,20 @@ def comparison_handoff_text(rows, scope="activity", comparison_context=None, sim
                 cadence=format_number(row["avg_cadence_spm"], 1),
                 stride=format_number(row["avg_stride_length_mm"], 0),
                 gct=format_number(row["avg_gct_ms"], 0),
+                temperature=format_number(row["temperature_c"], 1),
+                humidity=format_number(row["humidity_pct"], 0),
+                wind_speed=format_number(row["wind_speed_mps"], 1),
+                wind_direction=format_number(row["wind_direction_deg"], 0),
+                weather=row["weather_description"] or "",
+                gain=format_number(row.get("elevation_gain_m"), 0),
+                loss=format_number(row.get("elevation_loss_m"), 0),
+                rpe=row.get("garmin_perceived_effort") or "",
+                feeling=row.get("garmin_feeling") or "",
+                stamina_start=format_number(row.get("stamina_start_pct"), 0),
+                stamina_end=format_number(row.get("stamina_end_pct"), 0),
+                stamina_drop=format_number(
+                    float(row["stamina_start_pct"]) - float(row["stamina_end_pct"]), 0
+                ) if row.get("stamina_start_pct") is not None and row.get("stamina_end_pct") is not None else "",
             )
         )
     primary_segment_rows = []
@@ -5895,7 +5928,7 @@ def comparison_image_prompt(rows, scope="activity", comparison_context=None, sim
     return (
         "請根據以下 CoachOS 活動比較表產生一張清楚、適合跑者閱讀的數據圖。\n"
         "使用淺色背景、繁體中文標籤，包含四個面板：距離、配速、平均心率、訓練負荷；"
-        "以日期為 X 軸，活動名稱作為圖例，數值單位要清楚，避免捏造表格以外的數據。\n\n"
+        "若環境欄位有資料，可在圖表註記氣溫、濕度與風速；以日期為 X 軸，活動名稱作為圖例，數值單位要清楚，避免捏造表格以外的數據。\n\n"
         f"比較範圍：{scope_label}\n活動：{names}\n\n"
         f"{comparison_handoff_text(rows, scope, comparison_context, similarity_result)}"
     )
@@ -6056,6 +6089,19 @@ def find_similar_activities(connection, context):
                 },
                 "segment_metrics": activity_segment_metrics(connection, row["activity_id"]),
                 "segment_intent": infer_segment_intent(row),
+                "comparison_context": {
+                    "shoe_display_name": row["shoe_display_name"] if "shoe_display_name" in row.keys() else None,
+                    "temperature_c": row["temperature_c"] if "temperature_c" in row.keys() else None,
+                    "humidity_pct": row["humidity_pct"] if "humidity_pct" in row.keys() else None,
+                    "wind_speed_mps": row["wind_speed_mps"] if "wind_speed_mps" in row.keys() else None,
+                    "wind_direction_deg": row["wind_direction_deg"] if "wind_direction_deg" in row.keys() else None,
+                    "weather_description": row["weather_description"] if "weather_description" in row.keys() else None,
+                    "garmin_perceived_effort": row["garmin_perceived_effort"] if "garmin_perceived_effort" in row.keys() else None,
+                    "garmin_feeling": row["garmin_feeling"] if "garmin_feeling" in row.keys() else None,
+                    "stamina_start_pct": row["stamina_start_pct"] if "stamina_start_pct" in row.keys() else None,
+                    "stamina_end_pct": row["stamina_end_pct"] if "stamina_end_pct" in row.keys() else None,
+                    **activity_route_metrics(connection, row["activity_id"]),
+                },
             }
             for row in candidates
             if any(item["activity_id"] == row["activity_id"] for item in included[:limit])
@@ -17006,7 +17052,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/open-rac":
             if ensure_rac_running():
-                self.redirect(f"http://{RAC_HOST}:{RAC_PORT}")
+                self.redirect(f"http://{RAC_HOST}:{RAC_PORT}/download-fit?download_mode=today")
                 return
             self.send_html(
                 render_dashboard(

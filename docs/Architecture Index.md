@@ -98,7 +98,7 @@ Application
 | SQLite Importer / Parser | Internal milestone E2E-002 | Implementation | Active | Project root |
 | Excel Schema | v1.1 | File schema | Stable | `40_Excel/` |
 | Query Layer | v1.0 | Implementation | Active | `analysis_platform/` |
-| CoachOS | v1.6.0 | Product release line | Evolving | Project root |
+| CoachOS | v1.6.1 | Product release line | Evolving | Project root |
 | Dashboard App | v0.4.12-alpha | Implementation | Active | `analysis_platform/dashboard_app.py` |
 | AI Coach | Not released | Product concept | Evolving | `50_AI/` |
 

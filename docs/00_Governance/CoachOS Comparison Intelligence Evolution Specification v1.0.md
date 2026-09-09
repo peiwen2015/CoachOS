@@ -224,7 +224,7 @@ Data Anomaly 不得被誤判為 Performance Anomaly。
 - repair or backfill status
 - calculation version
 
-Context Metrics 應進入平台判讀與 AI handoff，但不必全部出現在主比較表。
+Context Metrics 應進入平台判讀與 AI handoff；AI handoff 的比較表應直接列出已存在且可追溯的氣溫、濕度、風、鞋款、RPE、Stamina、爬升與下降欄位。缺值保留空白，不直接輸出精確 GPS 座標或推測路線。
 
 ## 7. Derived Metrics 邊界
 

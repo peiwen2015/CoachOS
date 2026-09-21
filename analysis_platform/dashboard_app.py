@@ -12051,32 +12051,61 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_c
             )
         )
 
-    table_rows = []
-    for row in rows:
-        name = shoe_display_name(row) or row["shoe_code"]
-        status = "服役中" if row["is_active"] else "已退役"
-        last_run = format_short_datetime(row["observed_last_run_time"]) if row["observed_last_run_time"] else "尚無跑步紀錄"
-        pace = format_pace_seconds(row["avg_pace_sec_per_km"]) or "—"
-        avg_hr = "" if row["avg_hr"] is None else str(int(round(row["avg_hr"])))
-        avg_load = "" if row["avg_training_load"] is None else format_number(row["avg_training_load"], 1)
-        cadence = "" if row["avg_cadence_spm"] is None else format_number(row["avg_cadence_spm"], 1)
-        detail_href = "/?" + urlencode({"page": "shoes", "shoe": row["shoe_code"]})
-        table_rows.append(
-            f"""
-            <tr>
-              <td><a class="inline-jump-link" href="{html.escape(detail_href, quote=True)}">{html.escape(name)}</a></td>
-              <td class="shoe-category-cell">{shoe_category_lines_html(row["category"])}</td>
-              <td>{html.escape(status)}</td>
-              <td>{row["run_count"]}</td>
-              <td>{format_number(row["total_distance_km"], 2)}</td>
-              <td>{html.escape(pace)}</td>
-              <td>{html.escape(avg_hr)}</td>
-              <td>{html.escape(avg_load)}</td>
-              <td>{html.escape(cadence)}</td>
-              <td>{html.escape(last_run)}</td>
-            </tr>
-            """
-        )
+    def overview_table_html(overview_rows, empty_text):
+        table_rows = []
+        for row in overview_rows:
+            name = shoe_display_name(row) or row["shoe_code"]
+            status = "服役中" if row["is_active"] else "已退役"
+            last_run = format_short_datetime(row["observed_last_run_time"]) if row["observed_last_run_time"] else "尚無跑步紀錄"
+            pace = format_pace_seconds(row["avg_pace_sec_per_km"]) or "—"
+            avg_hr = "" if row["avg_hr"] is None else str(int(round(row["avg_hr"])))
+            avg_load = "" if row["avg_training_load"] is None else format_number(row["avg_training_load"], 1)
+            cadence = "" if row["avg_cadence_spm"] is None else format_number(row["avg_cadence_spm"], 1)
+            detail_href = "/?" + urlencode({"page": "shoes", "shoe": row["shoe_code"]})
+            table_rows.append(
+                f"""
+                <tr>
+                  <td><a class="inline-jump-link" href="{html.escape(detail_href, quote=True)}">{html.escape(name)}</a></td>
+                  <td class="shoe-category-cell">{shoe_category_lines_html(row["category"])}</td>
+                  <td>{html.escape(status)}</td>
+                  <td>{row["run_count"]}</td>
+                  <td>{format_number(row["total_distance_km"], 2)}</td>
+                  <td>{html.escape(pace)}</td>
+                  <td>{html.escape(avg_hr)}</td>
+                  <td>{html.escape(avg_load)}</td>
+                  <td>{html.escape(cadence)}</td>
+                  <td>{html.escape(last_run)}</td>
+                </tr>
+                """
+            )
+        body = "".join(table_rows) if table_rows else f'<tr><td colspan="10">{html.escape(empty_text)}</td></tr>'
+        return f"""
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>鞋款</th>
+                  <th>分類</th>
+                  <th>狀態</th>
+                  <th>次數</th>
+                  <th>總公里</th>
+                  <th>平均配速</th>
+                  <th>平均心率</th>
+                  <th>平均負荷</th>
+                  <th>步頻</th>
+                  <th>最近一次</th>
+                </tr>
+              </thead>
+              <tbody>{body}</tbody>
+            </table>
+          </div>
+        """
+
+    overview_active_html = overview_table_html(active_rows, "目前沒有服役中的鞋款資料。")
+    overview_retired_html = overview_table_html(
+        [row for row in rows if not row["is_active"]],
+        "目前沒有已退役的鞋款資料。",
+    )
 
     workout_rows_html = []
     for row in workout_rows:
@@ -12268,6 +12297,14 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_c
         </div>
       </section>
       <section class="panel-section">
+        <h2>鞋款總覽</h2>
+        <p class="note">依鞋款狀態分開顯示，方便查看目前服役中的鞋款與歷史已退役鞋款。</p>
+        <h3>服役中</h3>
+        {overview_active_html}
+        <h3>已退役</h3>
+        {overview_retired_html}
+      </section>
+      <section class="panel-section">
         <h2>鞋款狀態</h2>
         <p class="note">先把鞋況整理乾淨，之後補歷史活動設定時，設定中心就能區分服役中與已退役鞋款。</p>
         <div class="table-wrap">
@@ -12305,28 +12342,6 @@ def shoes_page_panel(rows, intelligence_rows, workout_rows, status_rows, scope_c
               </tr>
             </thead>
             <tbody>{"".join(workout_rows_html) if workout_rows_html else '<tr><td colspan=\"10\">目前已標註資料還不夠。</td></tr>'}</tbody>
-          </table>
-        </div>
-      </section>
-      <section class="panel-section">
-        <h2>鞋款總覽</h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>鞋款</th>
-                <th>分類</th>
-                <th>狀態</th>
-                <th>次數</th>
-                <th>總公里</th>
-                <th>平均配速</th>
-                <th>平均心率</th>
-                <th>平均負荷</th>
-                <th>步頻</th>
-                <th>最近一次</th>
-              </tr>
-            </thead>
-            <tbody>{"".join(table_rows)}</tbody>
           </table>
         </div>
       </section>

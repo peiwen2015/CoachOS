@@ -2226,7 +2226,8 @@ def upsert_dimension(connection, table, code_column, row):
         values = [row[column] for column in update_columns]
         if table == "shoe":
             update_columns.append("category")
-            values.append(str(row["category"] or "").strip() or existing["category"])
+            existing_category = existing[1]
+            values.append(str(row["category"] or "").strip() or existing_category)
         assignments = ", ".join(f"{column} = ?" for column in update_columns)
         values.append(row[code_column])
         connection.execute(

@@ -2210,8 +2210,9 @@ def ensure_workout_purpose_map_table(connection, dropdown_options):
 
 
 def upsert_dimension(connection, table, code_column, row):
+    existing_columns = "id, category" if table == "shoe" else "id"
     existing = connection.execute(
-        f"SELECT id FROM {table} WHERE {code_column} = ?",
+        f"SELECT {existing_columns} FROM {table} WHERE {code_column} = ?",
         (row[code_column],),
     ).fetchone()
     columns = list(row)
@@ -2220,10 +2221,13 @@ def upsert_dimension(connection, table, code_column, row):
             column
             for column in columns
             if column != code_column
-            and not (table == "shoe" and column == "is_active")
+            and not (table == "shoe" and column in {"is_active", "category"})
         ]
-        assignments = ", ".join(f"{column} = ?" for column in update_columns)
         values = [row[column] for column in update_columns]
+        if table == "shoe":
+            update_columns.append("category")
+            values.append(str(row["category"] or "").strip() or existing["category"])
+        assignments = ", ".join(f"{column} = ?" for column in update_columns)
         values.append(row[code_column])
         connection.execute(
             f"UPDATE {table} SET {assignments} WHERE {code_column} = ?",
